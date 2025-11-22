@@ -6,7 +6,7 @@ app = Flask(__name__)
 app.secret_key = "abc123"  # Needed for Flask session
 
 # Initialize OpenAI client
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="YOURAPIKEYHERE")
 
 # Serve the HTML page
 @app.route("/")
@@ -53,3 +53,4 @@ def clear():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
