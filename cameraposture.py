@@ -86,7 +86,7 @@ class NotificationManager:
                 notification.notify(
                     title=title,
                     message=message,
-                    app_name="PosturePal",
+                    app_name="Desk Health Monitor",
                     timeout=5
                 )
                 self.last_notification_time = current_time
