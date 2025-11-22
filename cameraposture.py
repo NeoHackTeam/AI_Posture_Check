@@ -7,7 +7,8 @@ import time
 from datetime import datetime, timedelta
 import json
 import os
-from plyer import notification  # pip install plyer
+import subprocess
+import platform
 
 # -------------------------------
 # CONFIG & SETTINGS
@@ -21,21 +22,61 @@ DEFAULT_SETTINGS = {
     "neck_angle_threshold": 170,
     "shoulder_slouch_threshold": 160,
     "posture_warning_duration": 3,
-    "face_distance_threshold": 0.25,  # Normalized distance (closer = larger face)
-    "model_path": "pose_landmarker_full.task"
+    "face_distance_threshold": 0.25,
+    "model_path": "pose_landmarker_full.task",
+    "show_landmarks": True,
+    "minimal_mode": False,
+    "sound_enabled": True
 }
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, 'r') as f:
             settings = json.load(f)
-            # Merge with defaults for any missing keys
             return {**DEFAULT_SETTINGS, **settings}
     return DEFAULT_SETTINGS.copy()
 
 def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=2)
+
+# -------------------------------
+# CROSS-PLATFORM NOTIFICATIONS
+# -------------------------------
+class NotificationManager:
+    def __init__(self):
+        self.last_notification_time = 0
+        self.notification_cooldown = 10
+        self.system = platform.system()
+    
+    def send_notification(self, title, message):
+        current_time = time.time()
+        if current_time - self.last_notification_time >= self.notification_cooldown:
+            try:
+                if self.system == "Windows":
+                    # Using PowerShell for Windows notifications
+                    ps_script = f'''
+                    [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+                    $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+                    $toastXml = [xml] $template.GetXml()
+                    $toastXml.GetElementsByTagName("text")[0].AppendChild($toastXml.CreateTextNode("{title}")) | Out-Null
+                    $toastXml.GetElementsByTagName("text")[1].AppendChild($toastXml.CreateTextNode("{message}")) | Out-Null
+                    $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+                    $xml.LoadXml($toastXml.OuterXml)
+                    $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
+                    [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("PosturePal").Show($toast)
+                    '''
+                    subprocess.run(['powershell', '-Command', ps_script], 
+                                 capture_output=True, timeout=2)
+                elif self.system == "Darwin":  # macOS
+                    subprocess.run(['osascript', '-e', 
+                                  f'display notification "{message}" with title "{title}"'])
+                elif self.system == "Linux":
+                    subprocess.run(['notify-send', title, message])
+                
+                self.last_notification_time = current_time
+            except Exception as e:
+                print(f"Notification error: {e}")
 
 # -------------------------------
 # DATA LOGGING
@@ -50,7 +91,6 @@ class PostureLogger:
             "breaks_taken": 0
         }
         
-        # Create log file with headers if it doesn't exist
         if not os.path.exists(log_file):
             with open(log_file, 'w') as f:
                 f.write("timestamp,event_type,duration_seconds,details\n")
@@ -72,44 +112,79 @@ class PostureLogger:
         self.log_event("break_taken", 0, "20-20-20")
 
 # -------------------------------
-# NOTIFICATION SYSTEM
+# GLASSMORPHISM DRAWING UTILITIES
 # -------------------------------
-class NotificationManager:
-    def __init__(self):
-        self.last_notification_time = 0
-        self.notification_cooldown = 10  # Seconds between notifications
+def draw_glass_panel(frame, x, y, width, height, alpha=0.3, blur_amount=15):
+    """Draw a glassmorphism effect panel"""
+    # Create ROI
+    roi = frame[y:y+height, x:x+width].copy()
     
-    def send_notification(self, title, message):
-        current_time = time.time()
-        if current_time - self.last_notification_time >= self.notification_cooldown:
-            try:
-                notification.notify(
-                    title=title,
-                    message=message,
-                    app_name="Desk Health Monitor",
-                    timeout=5
-                )
-                self.last_notification_time = current_time
-            except Exception as e:
-                print(f"Notification error: {e}")
+    # Apply blur
+    blurred = cv2.GaussianBlur(roi, (blur_amount, blur_amount), 0)
+    
+    # Create white overlay with transparency
+    overlay = np.ones_like(blurred) * 255
+    overlay = cv2.addWeighted(blurred, 1-alpha, overlay, alpha, 0)
+    
+    # Add subtle gradient
+    gradient = np.linspace(255, 230, height).reshape(-1, 1)
+    gradient = np.repeat(gradient, width, axis=1)
+    gradient = np.stack([gradient] * 3, axis=2).astype(np.uint8)
+    overlay = cv2.addWeighted(overlay, 0.9, gradient, 0.1, 0)
+    
+    # Place back on frame
+    frame[y:y+height, x:x+width] = overlay
+    
+    # Add border with orange tint
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (255, 200, 150), 2)
+    
+    # Add inner glow
+    cv2.rectangle(frame, (x+1, y+1), (x + width-1, y + height-1), (255, 220, 180), 1)
+
+def draw_progress_bar(frame, x, y, width, height, progress, color=(255, 140, 0)):
+    """Draw an animated progress bar"""
+    # Background
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (200, 200, 200), -1)
+    
+    # Progress fill
+    fill_width = int(width * progress)
+    if fill_width > 0:
+        # Gradient effect
+        for i in range(fill_width):
+            alpha = 0.7 + 0.3 * (i / fill_width)
+            color_adjusted = tuple(int(c * alpha) for c in color)
+            cv2.line(frame, (x + i, y), (x + i, y + height), color_adjusted, 1)
+    
+    # Border
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (150, 150, 150), 1)
 
 # -------------------------------
-# SETTINGS UI
+# ENHANCED SETTINGS UI
 # -------------------------------
 class SettingsUI:
     def __init__(self, settings):
         self.settings = settings.copy()
         self.show = False
-        self.active_field = None
         self.fields = [
-            {"key": "work_interval", "name": "Work Interval (min)", "type": "int", "divisor": 60, "min": 1, "max": 60},
-            {"key": "break_duration", "name": "Break Duration (sec)", "type": "int", "divisor": 1, "min": 10, "max": 120},
-            {"key": "neck_angle_threshold", "name": "Neck Angle Threshold", "type": "int", "divisor": 1, "min": 140, "max": 180},
-            {"key": "shoulder_slouch_threshold", "name": "Shoulder Threshold", "type": "int", "divisor": 1, "min": 140, "max": 180},
-            {"key": "posture_warning_duration", "name": "Warning Delay (sec)", "type": "int", "divisor": 1, "min": 1, "max": 10},
-            {"key": "face_distance_threshold", "name": "Distance Threshold", "type": "float", "divisor": 1, "min": 0.15, "max": 0.40}
+            {"key": "work_interval", "name": "Work Interval", "type": "int", "unit": "min", 
+             "divisor": 60, "min": 1, "max": 60, "step": 1},
+            {"key": "break_duration", "name": "Break Duration", "type": "int", "unit": "sec", 
+             "divisor": 1, "min": 10, "max": 120, "step": 5},
+            {"key": "neck_angle_threshold", "name": "Neck Angle", "type": "int", "unit": "°", 
+             "divisor": 1, "min": 140, "max": 180, "step": 5},
+            {"key": "shoulder_slouch_threshold", "name": "Shoulder Angle", "type": "int", "unit": "°", 
+             "divisor": 1, "min": 140, "max": 180, "step": 5},
+            {"key": "posture_warning_duration", "name": "Warning Delay", "type": "int", "unit": "sec", 
+             "divisor": 1, "min": 1, "max": 10, "step": 1},
+            {"key": "face_distance_threshold", "name": "Distance Threshold", "type": "float", "unit": "", 
+             "divisor": 1, "min": 0.15, "max": 0.40, "step": 0.01},
+            {"key": "show_landmarks", "name": "Show Landmarks", "type": "bool", "unit": "", 
+             "divisor": 1, "min": 0, "max": 1, "step": 1},
+            {"key": "minimal_mode", "name": "Minimal Mode", "type": "bool", "unit": "", 
+             "divisor": 1, "min": 0, "max": 1, "step": 1},
         ]
-        self.scroll_offset = 0
+        self.hover_field = -1
+        self.hover_button = None
     
     def toggle(self):
         self.show = not self.show
@@ -120,86 +195,219 @@ class SettingsUI:
         
         h, w, _ = frame.shape
         
-        # Semi-transparent overlay
-        overlay = frame.copy()
-        panel_width = 500
-        panel_height = 450
+        panel_width = 600
+        panel_height = 550
         panel_x = (w - panel_width) // 2
         panel_y = (h - panel_height) // 2
         
-        cv2.rectangle(overlay, (panel_x, panel_y), 
-                     (panel_x + panel_width, panel_y + panel_height), 
-                     (40, 40, 40), -1)
-        cv2.addWeighted(overlay, 0.95, frame, 0.05, 0, frame)
+        # Draw glassmorphism panel
+        draw_glass_panel(frame, panel_x, panel_y, panel_width, panel_height, alpha=0.25)
         
-        # Border
-        cv2.rectangle(frame, (panel_x, panel_y), 
-                     (panel_x + panel_width, panel_y + panel_height), 
-                     (200, 200, 200), 2)
+        # Title with orange gradient
+        title_y = panel_y + 50
+        cv2.putText(frame, "SETTINGS", (panel_x + 30, title_y), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 140, 0), 3)
         
-        # Title
-        cv2.putText(frame, "SETTINGS", (panel_x + 20, panel_y + 40), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+        # Decorative line
+        cv2.line(frame, (panel_x + 30, title_y + 10), 
+                (panel_x + panel_width - 30, title_y + 10), (255, 180, 100), 2)
         
         # Fields
-        y_offset = panel_y + 80
+        y_offset = panel_y + 100
+        field_height = 45
+        
         for i, field in enumerate(self.fields):
-            value = self.settings[field["key"]] / field["divisor"]
+            field_y = y_offset + i * field_height
+            value = self.settings[field["key"]]
+            
+            # Hover effect
+            if self.hover_field == i:
+                cv2.rectangle(frame, (panel_x + 20, field_y - 25), 
+                            (panel_x + panel_width - 20, field_y + 15), 
+                            (255, 220, 180, 50), -1)
             
             # Field name
-            cv2.putText(frame, field["name"], (panel_x + 20, y_offset), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+            cv2.putText(frame, field["name"], (panel_x + 30, field_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 80, 80), 2)
             
-            # Value with +/- buttons
-            value_str = f"{value:.2f}" if field["type"] == "float" else f"{int(value)}"
-            
-            # Draw - button
-            button_y = y_offset - 15
-            cv2.rectangle(frame, (panel_x + 350, button_y), 
-                         (panel_x + 380, button_y + 25), (100, 100, 100), -1)
-            cv2.putText(frame, "-", (panel_x + 360, button_y + 18), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-            
-            # Draw value
-            cv2.putText(frame, value_str, (panel_x + 390, y_offset), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            
-            # Draw + button
-            cv2.rectangle(frame, (panel_x + 450, button_y), 
-                         (panel_x + 480, button_y + 25), (100, 100, 100), -1)
-            cv2.putText(frame, "+", (panel_x + 457, button_y + 18), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-            
-            y_offset += 50
+            if field["type"] == "bool":
+                # Toggle switch
+                switch_x = panel_x + panel_width - 100
+                switch_y = field_y - 15
+                switch_w = 60
+                switch_h = 25
+                
+                # Switch background
+                bg_color = (100, 200, 100) if value else (200, 100, 100)
+                cv2.rectangle(frame, (switch_x, switch_y), 
+                            (switch_x + switch_w, switch_y + switch_h), bg_color, -1)
+                cv2.rectangle(frame, (switch_x, switch_y), 
+                            (switch_x + switch_w, switch_y + switch_h), (150, 150, 150), 2)
+                
+                # Switch knob
+                knob_x = switch_x + switch_w - 20 if value else switch_x + 5
+                cv2.circle(frame, (knob_x + 10, switch_y + switch_h // 2), 10, (255, 255, 255), -1)
+                
+                # Store button position
+                field["button_rect"] = (switch_x, switch_y, switch_w, switch_h)
+            else:
+                # Value display
+                if field["type"] == "float":
+                    display_value = f"{value / field['divisor']:.2f}"
+                else:
+                    display_value = f"{int(value / field['divisor'])}"
+                
+                value_str = f"{display_value} {field['unit']}"
+                
+                # Minus button
+                minus_x = panel_x + panel_width - 200
+                minus_y = field_y - 18
+                minus_w = 35
+                minus_h = 30
+                
+                minus_color = (255, 180, 100) if self.hover_button == (i, '-') else (220, 220, 220)
+                cv2.rectangle(frame, (minus_x, minus_y), 
+                            (minus_x + minus_w, minus_y + minus_h), minus_color, -1)
+                cv2.rectangle(frame, (minus_x, minus_y), 
+                            (minus_x + minus_w, minus_y + minus_h), (150, 150, 150), 2)
+                cv2.putText(frame, "-", (minus_x + 12, minus_y + 22), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 80), 2)
+                
+                # Value
+                value_x = minus_x + minus_w + 15
+                cv2.putText(frame, value_str, (value_x, field_y), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 100, 0), 2)
+                
+                # Plus button
+                plus_x = panel_x + panel_width - 70
+                plus_y = field_y - 18
+                plus_w = 35
+                plus_h = 30
+                
+                plus_color = (255, 180, 100) if self.hover_button == (i, '+') else (220, 220, 220)
+                cv2.rectangle(frame, (plus_x, plus_y), 
+                            (plus_x + plus_w, plus_y + plus_h), plus_color, -1)
+                cv2.rectangle(frame, (plus_x, plus_y), 
+                            (plus_x + plus_w, plus_y + plus_h), (150, 150, 150), 2)
+                cv2.putText(frame, "+", (plus_x + 10, plus_y + 22), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 80), 2)
+                
+                # Store button positions
+                field["minus_rect"] = (minus_x, minus_y, minus_w, minus_h)
+                field["plus_rect"] = (plus_x, plus_y, plus_w, plus_h)
         
-        # Buttons
-        button_y = panel_y + panel_height - 60
+        # Save and Cancel buttons
+        button_y = panel_y + panel_height - 70
         
         # Save button
-        cv2.rectangle(frame, (panel_x + 100, button_y), 
-                     (panel_x + 200, button_y + 40), (0, 200, 0), -1)
-        cv2.putText(frame, "SAVE", (panel_x + 130, button_y + 27), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        save_x = panel_x + 120
+        save_color = (100, 200, 100) if self.hover_button == 'save' else (150, 220, 150)
+        cv2.rectangle(frame, (save_x, button_y), 
+                     (save_x + 140, button_y + 45), save_color, -1)
+        cv2.rectangle(frame, (save_x, button_y), 
+                     (save_x + 140, button_y + 45), (100, 180, 100), 3)
+        cv2.putText(frame, "SAVE", (save_x + 35, button_y + 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
         
         # Cancel button
-        cv2.rectangle(frame, (panel_x + 300, button_y), 
-                     (panel_x + 400, button_y + 40), (0, 0, 200), -1)
-        cv2.putText(frame, "CANCEL", (panel_x + 315, button_y + 27), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cancel_x = panel_x + 340
+        cancel_color = (200, 100, 100) if self.hover_button == 'cancel' else (220, 150, 150)
+        cv2.rectangle(frame, (cancel_x, button_y), 
+                     (cancel_x + 140, button_y + 45), cancel_color, -1)
+        cv2.rectangle(frame, (cancel_x, button_y), 
+                     (cancel_x + 140, button_y + 45), (180, 100, 100), 3)
+        cv2.putText(frame, "CANCEL", (cancel_x + 20, button_y + 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
         
-        cv2.putText(frame, "Press 'S' to close", (panel_x + 20, panel_y + panel_height - 15), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
+        # Store button positions
+        self.save_button_rect = (save_x, button_y, 140, 45)
+        self.cancel_button_rect = (cancel_x, button_y, 140, 45)
+        
+        # Hint
+        cv2.putText(frame, "Click buttons to adjust values | Press 'S' to toggle", 
+                   (panel_x + 30, panel_y + panel_height - 20), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.45, (120, 120, 120), 1)
+    
+    def handle_click(self, x, y):
+        """Handle mouse clicks on settings UI"""
+        if not self.show:
+            return None
+        
+        # Check save button
+        if hasattr(self, 'save_button_rect'):
+            bx, by, bw, bh = self.save_button_rect
+            if bx <= x <= bx + bw and by <= y <= by + bh:
+                return "save"
+        
+        # Check cancel button
+        if hasattr(self, 'cancel_button_rect'):
+            bx, by, bw, bh = self.cancel_button_rect
+            if bx <= x <= bx + bw and by <= y <= by + bh:
+                return "cancel"
+        
+        # Check field buttons
+        for i, field in enumerate(self.fields):
+            if field["type"] == "bool":
+                if "button_rect" in field:
+                    bx, by, bw, bh = field["button_rect"]
+                    if bx <= x <= bx + bw and by <= y <= by + bh:
+                        self.settings[field["key"]] = not self.settings[field["key"]]
+                        return "toggle"
+            else:
+                if "minus_rect" in field:
+                    bx, by, bw, bh = field["minus_rect"]
+                    if bx <= x <= bx + bw and by <= y <= by + bh:
+                        self.adjust_value(i, False)
+                        return "adjust"
+                
+                if "plus_rect" in field:
+                    bx, by, bw, bh = field["plus_rect"]
+                    if bx <= x <= bx + bw and by <= y <= by + bh:
+                        self.adjust_value(i, True)
+                        return "adjust"
+        
+        return None
+    
+    def handle_hover(self, x, y):
+        """Handle mouse hover for visual feedback"""
+        if not self.show:
+            return
+        
+        self.hover_field = -1
+        self.hover_button = None
+        
+        # Check save/cancel buttons
+        if hasattr(self, 'save_button_rect'):
+            bx, by, bw, bh = self.save_button_rect
+            if bx <= x <= bx + bw and by <= y <= by + bh:
+                self.hover_button = 'save'
+        
+        if hasattr(self, 'cancel_button_rect'):
+            bx, by, bw, bh = self.cancel_button_rect
+            if bx <= x <= bx + bw and by <= y <= by + bh:
+                self.hover_button = 'cancel'
+        
+        # Check field buttons
+        for i, field in enumerate(self.fields):
+            if field["type"] != "bool":
+                if "minus_rect" in field:
+                    bx, by, bw, bh = field["minus_rect"]
+                    if bx <= x <= bx + bw and by <= y <= by + bh:
+                        self.hover_button = (i, '-')
+                        self.hover_field = i
+                
+                if "plus_rect" in field:
+                    bx, by, bw, bh = field["plus_rect"]
+                    if bx <= x <= bx + bw and by <= y <= by + bh:
+                        self.hover_button = (i, '+')
+                        self.hover_field = i
     
     def adjust_value(self, field_index, increment):
         field = self.fields[field_index]
         current_value = self.settings[field["key"]]
         
-        if field["type"] == "int":
-            step = field["divisor"]
-            new_value = current_value + (step if increment else -step)
-        else:
-            step = 0.01
-            new_value = current_value + (step if increment else -step)
+        step = field["step"] * field["divisor"]
+        new_value = current_value + (step if increment else -step)
         
         # Clamp to min/max
         min_val = field["min"] * field["divisor"]
@@ -207,79 +415,124 @@ class SettingsUI:
         self.settings[field["key"]] = max(min_val, min(max_val, new_value))
 
 # -------------------------------
-# COMPACT OVERLAY
+# ENHANCED COMPACT OVERLAY
 # -------------------------------
 class CompactOverlay:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.width = 250
-        self.height = 110
+        self.width = 320
+        self.height = 140
         self.dragging = False
         self.drag_offset_x = 0
         self.drag_offset_y = 0
+        self.pulse_phase = 0
     
-    def draw(self, frame, posture_tracker, timer):
-        # Semi-transparent background
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (self.x, self.y), 
-                     (self.x + self.width, self.y + self.height), 
-                     (30, 30, 30), -1)
-        cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+    def draw(self, frame, posture_tracker, timer, settings):
+        if settings.get("minimal_mode", False):
+            self.draw_minimal(frame, posture_tracker, timer)
+            return
         
-        # Border
-        cv2.rectangle(frame, (self.x, self.y), 
-                     (self.x + self.width, self.y + self.height), 
-                     (100, 100, 100), 1)
+        # Glassmorphism panel
+        draw_glass_panel(frame, self.x, self.y, self.width, self.height, alpha=0.2)
+        
+        # Pulse animation for warnings
+        self.pulse_phase = (self.pulse_phase + 0.05) % (2 * np.pi)
+        
+        # Title
+        cv2.putText(frame, "PosturePal", (self.x + 15, self.y + 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 140, 0), 2)
         
         # Bad posture time
         bad_minutes = posture_tracker.get_total_bad_posture_minutes()
+        color = (100, 100, 255) if bad_minutes == 0 else (100, 100, 255)
         cv2.putText(frame, f"Bad Posture: {bad_minutes}m", 
-                   (self.x + 10, self.y + 25), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 100, 100), 1)
+                   (self.x + 15, self.y + 60), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
         
-        # Next break timer
+        # Timer status
         time_remaining = timer.get_time_remaining()
         time_str = timer.format_time(time_remaining)
-        status = "Break" if timer.on_break else "Next Break"
+        status = "Break Time!" if timer.on_break else "Next Break"
+        status_color = (0, 200, 0) if timer.on_break else (255, 140, 0)
+        
         cv2.putText(frame, f"{status}: {time_str}", 
-                   (self.x + 10, self.y + 50), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 255, 100), 1)
+                   (self.x + 15, self.y + 90), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.55, status_color, 2)
+        
+        # Progress bar
+        if not timer.on_break:
+            progress = 1 - (time_remaining / timer.work_duration)
+            draw_progress_bar(frame, self.x + 15, self.y + 100, 
+                            self.width - 30, 12, progress, (255, 140, 0))
         
         # Play/Pause button
-        button_x = self.x + 10
-        button_y = self.y + 60
-        button_size = 30
+        button_x = self.x + 15
+        button_y = self.y + 115
+        button_size = 20
+        
+        button_color = (150, 220, 150) if timer.paused else (220, 200, 150)
+        cv2.circle(frame, (button_x + button_size//2, button_y + button_size//2), 
+                  button_size//2, button_color, -1)
+        cv2.circle(frame, (button_x + button_size//2, button_y + button_size//2), 
+                  button_size//2, (100, 100, 100), 2)
         
         if timer.paused:
-            # Play button (triangle)
-            pts = np.array([[button_x + 5, button_y], 
-                           [button_x + 5, button_y + button_size],
-                           [button_x + button_size, button_y + button_size//2]], np.int32)
-            cv2.fillPoly(frame, [pts], (100, 200, 100))
+            # Play triangle
+            pts = np.array([
+                [button_x + 7, button_y + 5],
+                [button_x + 7, button_y + 15],
+                [button_x + 15, button_y + 10]
+            ], np.int32)
+            cv2.fillPoly(frame, [pts], (80, 80, 80))
         else:
-            # Pause button (two rectangles)
-            cv2.rectangle(frame, (button_x + 5, button_y), 
-                         (button_x + 12, button_y + button_size), (200, 200, 100), -1)
-            cv2.rectangle(frame, (button_x + 18, button_y), 
-                         (button_x + 25, button_y + button_size), (200, 200, 100), -1)
+            # Pause bars
+            cv2.rectangle(frame, (button_x + 6, button_y + 5), 
+                         (button_x + 9, button_y + 15), (80, 80, 80), -1)
+            cv2.rectangle(frame, (button_x + 11, button_y + 5), 
+                         (button_x + 14, button_y + 15), (80, 80, 80), -1)
         
-        # Settings button (gear icon approximation)
-        settings_x = self.x + 50
-        cv2.circle(frame, (settings_x, button_y + button_size//2), 12, (150, 150, 150), -1)
-        cv2.circle(frame, (settings_x, button_y + button_size//2), 6, (30, 30, 30), -1)
-        cv2.putText(frame, "S", (settings_x - 5, button_y + button_size//2 + 5), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        # Settings button
+        settings_x = button_x + 35
+        cv2.circle(frame, (settings_x + 10, button_y + 10), 10, (220, 220, 220), -1)
+        cv2.circle(frame, (settings_x + 10, button_y + 10), 10, (100, 100, 100), 2)
+        cv2.putText(frame, "S", (settings_x + 6, button_y + 14), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.45, (80, 80, 80), 2)
+        
+        # Store button positions
+        self.play_pause_rect = (button_x, button_y, button_size, button_size)
+        self.settings_rect = (settings_x, button_y, 20, 20)
+    
+    def draw_minimal(self, frame, posture_tracker, timer):
+        """Minimal mode - just a small status indicator"""
+        self.width = 150
+        self.height = 50
+        
+        draw_glass_panel(frame, self.x, self.y, self.width, self.height, alpha=0.15)
+        
+        bad_minutes = posture_tracker.get_total_bad_posture_minutes()
+        time_str = timer.format_time(timer.get_time_remaining())
+        
+        cv2.putText(frame, f"Bad: {bad_minutes}m", (self.x + 10, self.y + 25), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 255), 1)
+        cv2.putText(frame, time_str, (self.x + 10, self.y + 42), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 140, 0), 1)
     
     def is_inside(self, x, y):
         return (self.x <= x <= self.x + self.width and 
                 self.y <= y <= self.y + self.height)
     
     def is_play_pause_clicked(self, x, y):
-        button_x = self.x + 10
-        button_y = self.y + 60
-        return (button_x <= x <= button_x + 30 and 
-                button_y <= y <= button_y + 30)
+        if hasattr(self, 'play_pause_rect'):
+            bx, by, bw, bh = self.play_pause_rect
+            return bx <= x <= bx + bw and by <= y <= by + bh
+        return False
+    
+    def is_settings_clicked(self, x, y):
+        if hasattr(self, 'settings_rect'):
+            bx, by, bw, bh = self.settings_rect
+            return bx <= x <= bx + bw and by <= y <= by + bh
+        return False
 
 # -------------------------------
 # Timer Class
@@ -298,12 +551,10 @@ class WorkBreakTimer:
         
     def toggle_pause(self):
         if self.paused:
-            # Resume
             if self.pause_start_time:
                 self.total_paused_time += time.time() - self.pause_start_time
             self.paused = False
         else:
-            # Pause
             self.pause_start_time = time.time()
             self.paused = True
     
@@ -421,7 +672,6 @@ def calculate_angle(a_coords, b_coords, c_coords):
 # Distance Calculation
 # -------------------------------
 def calculate_face_distance(landmarks, mp_pose):
-    # Use distance between eyes as proxy for face size/distance
     left_eye = landmarks[mp_pose.PoseLandmark.LEFT_EYE.value]
     right_eye = landmarks[mp_pose.PoseLandmark.RIGHT_EYE.value]
     
@@ -429,40 +679,75 @@ def calculate_face_distance(landmarks, mp_pose):
     return eye_distance
 
 # -------------------------------
-# Break Reminder UI
+# Enhanced Break Reminder UI
 # -------------------------------
 def draw_break_reminder(frame):
     h, w, _ = frame.shape
+    
+    # Dark overlay
     overlay = frame.copy()
-    cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.8, frame, 0.2, 0, frame)
+    cv2.rectangle(overlay, (0, 0), (w, h), (20, 20, 20), -1)
+    cv2.addWeighted(overlay, 0.85, frame, 0.15, 0, frame)
+    
+    # Center panel
+    panel_width = 600
+    panel_height = 400
+    panel_x = (w - panel_width) // 2
+    panel_y = (h - panel_height) // 2
+    
+    # Glassmorphism panel
+    draw_glass_panel(frame, panel_x, panel_y, panel_width, panel_height, alpha=0.2)
+    
+    # Animated title
+    pulse = int(10 * np.sin(time.time() * 3))
+    cv2.putText(frame, "TIME FOR A BREAK!", 
+               (panel_x + 80, panel_y + 80), 
+               cv2.FONT_HERSHEY_SIMPLEX, 1.4, (255, 140 + pulse, 0), 3)
+    
+    # Decorative line
+    cv2.line(frame, (panel_x + 80, panel_y + 95), 
+            (panel_x + panel_width - 80, panel_y + 95), (255, 180, 100), 3)
     
     messages = [
-        "TIME FOR A BREAK!",
-        "",
-        "20-20-20 Rule:",
-        "Look at something 20 feet away",
-        "for 20 seconds",
-        "",
-        "Press SPACE to acknowledge"
+        ("20-20-20 Rule", 1.0, (255, 200, 100)),
+        ("", 0.5, (255, 255, 255)),
+        ("Look at something 20 feet away", 0.75, (240, 240, 240)),
+        ("for 20 seconds", 0.75, (240, 240, 240)),
+        ("", 0.5, (255, 255, 255)),
+        ("This helps reduce eye strain", 0.6, (200, 200, 200)),
+        ("and gives your posture a reset", 0.6, (200, 200, 200)),
     ]
     
-    start_y = h // 2 - len(messages) * 20
-    for i, msg in enumerate(messages):
-        if i == 0:
-            color = (0, 255, 255)
-            size = 1.5
-        elif i in [2]:
-            color = (255, 200, 0)
-            size = 1.0
-        else:
-            color = (255, 255, 255)
-            size = 0.8
-        
-        text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, size, 2)[0]
-        text_x = (w - text_size[0]) // 2
-        cv2.putText(frame, msg, (text_x, start_y + i * 40), 
-                    cv2.FONT_HERSHEY_SIMPLEX, size, color, 2)
+    start_y = panel_y + 140
+    for i, (msg, size, color) in enumerate(messages):
+        if msg:
+            text_size = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, size, 2)[0]
+            text_x = (w - text_size[0]) // 2
+            cv2.putText(frame, msg, (text_x, start_y + i * 35), 
+                       cv2.FONT_HERSHEY_SIMPLEX, size, color, 2)
+    
+    # Acknowledge button
+    button_width = 250
+    button_height = 50
+    button_x = (w - button_width) // 2
+    button_y = panel_y + panel_height - 90
+    
+    # Button with glow effect
+    cv2.rectangle(frame, (button_x, button_y), 
+                 (button_x + button_width, button_y + button_height), 
+                 (255, 180, 100), -1)
+    cv2.rectangle(frame, (button_x - 2, button_y - 2), 
+                 (button_x + button_width + 2, button_y + button_height + 2), 
+                 (255, 140, 0), 3)
+    
+    cv2.putText(frame, "ACKNOWLEDGE", 
+               (button_x + 35, button_y + 35), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+    
+    # Hint text
+    cv2.putText(frame, "Press SPACE or click button", 
+               (panel_x + 160, panel_y + panel_height - 30), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
 
 # -------------------------------
 # Mouse Callback
@@ -471,17 +756,32 @@ def mouse_callback(event, x, y, flags, param):
     overlay, settings_ui, timer = param
     
     if event == cv2.EVENT_LBUTTONDOWN:
-        if overlay.is_play_pause_clicked(x, y):
-            timer.toggle_pause()
-        elif overlay.is_inside(x, y):
-            overlay.dragging = True
-            overlay.drag_offset_x = x - overlay.x
-            overlay.drag_offset_y = y - overlay.y
+        # Check settings UI clicks
+        if settings_ui.show:
+            action = settings_ui.handle_click(x, y)
+            if action == "save":
+                return  # Handled in main loop
+            elif action == "cancel":
+                return  # Handled in main loop
+        else:
+            # Check overlay clicks
+            if overlay.is_settings_clicked(x, y):
+                settings_ui.toggle()
+            elif overlay.is_play_pause_clicked(x, y):
+                timer.toggle_pause()
+            elif overlay.is_inside(x, y):
+                overlay.dragging = True
+                overlay.drag_offset_x = x - overlay.x
+                overlay.drag_offset_y = y - overlay.y
     
     elif event == cv2.EVENT_MOUSEMOVE:
         if overlay.dragging:
             overlay.x = x - overlay.drag_offset_x
             overlay.y = y - overlay.drag_offset_y
+        
+        # Handle hover effects
+        if settings_ui.show:
+            settings_ui.handle_hover(x, y)
     
     elif event == cv2.EVENT_LBUTTONUP:
         overlay.dragging = False
@@ -489,206 +789,282 @@ def mouse_callback(event, x, y, flags, param):
 # -------------------------------
 # MAIN
 # -------------------------------
-settings = load_settings()
-model_path = settings["model_path"]
-
-BaseOptions = mp.tasks.BaseOptions
-PoseLandmarker = mp.tasks.vision.PoseLandmarker
-PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
-VisionRunningMode = mp.tasks.vision.RunningMode
-
-options = PoseLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path=model_path),
-    running_mode=VisionRunningMode.VIDEO,
-    output_segmentation_masks=False
-)
-
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    print("Error: Webcam not found.")
-    exit()
-
-# Initialize components
-timer = WorkBreakTimer(settings["work_interval"], settings["break_duration"])
-posture_tracker = PostureTracker(settings["posture_warning_duration"])
-logger = PostureLogger(LOG_FILE)
-notif_manager = NotificationManager()
-settings_ui = SettingsUI(settings)
-compact_overlay = CompactOverlay(10, 10)
-
-# Window setup
-cv2.namedWindow("Desk Health Monitor")
-cv2.setMouseCallback("Desk Health Monitor", mouse_callback, (compact_overlay, settings_ui, timer))
-
-# Track window focus
-window_focused = True
-last_focus_check = time.time()
-last_distance_warning_time = 0
-
-with PoseLandmarker.create_from_options(options) as landmarker:
-    timestamp = 0
-    mp_drawing = mp.solutions.drawing_utils
-    mp_pose = mp.solutions.pose
-    POSE_CONNECTIONS = mp_pose.POSE_CONNECTIONS
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+def main():
+    settings = load_settings()
+    model_path = settings["model_path"]
+    
+    # Check if model exists
+    if not os.path.exists(model_path):
+        print(f"Error: Model file '{model_path}' not found!")
+        print("Please download the pose landmarker model from:")
+        print("https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task")
+        return
+    
+    BaseOptions = mp.tasks.BaseOptions
+    PoseLandmarker = mp.tasks.vision.PoseLandmarker
+    PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
+    VisionRunningMode = mp.tasks.vision.RunningMode
+    
+    options = PoseLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=model_path),
+        running_mode=VisionRunningMode.VIDEO,
+        output_segmentation_masks=False
+    )
+    
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Error: Webcam not found.")
+        return
+    
+    # Set camera resolution
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    
+    # Initialize components
+    timer = WorkBreakTimer(settings["work_interval"], settings["break_duration"])
+    posture_tracker = PostureTracker(settings["posture_warning_duration"])
+    logger = PostureLogger(LOG_FILE)
+    notif_manager = NotificationManager()
+    settings_ui = SettingsUI(settings)
+    compact_overlay = CompactOverlay(20, 20)
+    
+    # Window setup
+    cv2.namedWindow("PosturePal - Desk Health Monitor")
+    cv2.setMouseCallback("PosturePal - Desk Health Monitor", mouse_callback, 
+                        (compact_overlay, settings_ui, timer))
+    
+    # Track various states
+    window_focused = True
+    last_focus_check = time.time()
+    last_distance_warning_time = 0
+    last_logged_posture_time = 0
+    
+    with PoseLandmarker.create_from_options(options) as landmarker:
+        timestamp = 0
+        mp_drawing = mp.solutions.drawing_utils
+        mp_pose = mp.solutions.pose
+        POSE_CONNECTIONS = mp_pose.POSE_CONNECTIONS
         
-        result = landmarker.detect_for_video(mp_image, timestamp)
-        timestamp += 33
-
-        h, w, _ = frame.shape
-        is_bad_posture = False
-        posture_type = None
-
-        # Check window focus
-        current_time = time.time()
-        if current_time - last_focus_check > 1.0:
-            try:
-                window_name = cv2.getWindowProperty("Desk Health Monitor", cv2.WND_PROP_VISIBLE)
-                window_focused = window_name >= 1
-            except:
-                window_focused = False
-            last_focus_check = current_time
-
-        # Posture analysis
-        if result.pose_landmarks:
-            landmarks = result.pose_landmarks[0]
+        print("PosturePal started! Press 'Q' to quit, 'S' for settings.")
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
             
-            try:
-                # Neck angle
-                ear_l = landmarks[mp_pose.PoseLandmark.LEFT_EAR.value]
-                shoulder_l = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
-                hip_l = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
-                neck_angle = calculate_angle(ear_l, shoulder_l, hip_l)
+            frame = cv2.flip(frame, 1)  # Mirror the frame
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+            
+            result = landmarker.detect_for_video(mp_image, timestamp)
+            timestamp += 33
+            
+            h, w, _ = frame.shape
+            is_bad_posture = False
+            posture_type = None
+            current_time = time.time()
+            
+            # Check window focus
+            if current_time - last_focus_check > 1.0:
+                try:
+                    window_prop = cv2.getWindowProperty("PosturePal - Desk Health Monitor", 
+                                                       cv2.WND_PROP_VISIBLE)
+                    window_focused = window_prop >= 1
+                except:
+                    window_focused = False
+                last_focus_check = current_time
+            
+            # Posture analysis
+            if result.pose_landmarks and len(result.pose_landmarks) > 0:
+                landmarks = result.pose_landmarks[0]
                 
-                # Shoulder angle
-                elbow_l = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value]
-                shoulder_angle = calculate_angle(ear_l, shoulder_l, elbow_l)
-                
-                # Distance check
-                face_distance = calculate_face_distance(landmarks, mp_pose)
-                too_close = face_distance > settings["face_distance_threshold"]
-                
-                if too_close and current_time - last_distance_warning_time > 5:
-                    cv2.putText(frame, "TOO CLOSE TO SCREEN!", 
-                               (w // 2 - 200, h - 50), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 3)
-                    logger.log_distance_warning()
-                    if not window_focused:
-                        notif_manager.send_notification("Distance Warning", 
-                                                       "You're too close to the screen!")
-                    last_distance_warning_time = current_time
-                
-                # Posture checks
-                if neck_angle < settings["neck_angle_threshold"]:
-                    is_bad_posture = True
-                    posture_type = "forward_head"
-                    if posture_tracker.should_show_warning():
-                        cv2.putText(frame, "HEAD FORWARD! Sit Up Straight!", 
-                                   (w // 2 - 250, 120), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
+                try:
+                    # Neck angle
+                    ear_l = landmarks[mp_pose.PoseLandmark.LEFT_EAR.value]
+                    shoulder_l = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
+                    hip_l = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
+                    neck_angle = calculate_angle(ear_l, shoulder_l, hip_l)
+                    
+                    # Shoulder angle
+                    elbow_l = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value]
+                    shoulder_angle = calculate_angle(ear_l, shoulder_l, elbow_l)
+                    
+                    # Distance check
+                    face_distance = calculate_face_distance(landmarks, mp_pose)
+                    too_close = face_distance > settings["face_distance_threshold"]
+                    
+                    # Distance warning with glassmorphism
+                    if too_close and current_time - last_distance_warning_time > 5:
+                        # Warning panel
+                        warn_w = 450
+                        warn_h = 80
+                        warn_x = (w - warn_w) // 2
+                        warn_y = h - 120
+                        
+                        draw_glass_panel(frame, warn_x, warn_y, warn_w, warn_h, alpha=0.2)
+                        
+                        pulse = int(15 * np.sin(current_time * 5))
+                        cv2.putText(frame, "TOO CLOSE TO SCREEN!", 
+                                   (warn_x + 50, warn_y + 50), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, 
+                                   (255, 165 + pulse, 0), 3)
+                        
+                        logger.log_distance_warning()
                         if not window_focused:
-                            notif_manager.send_notification("Posture Alert", 
-                                                           "Head forward - sit up straight!")
+                            notif_manager.send_notification("Distance Warning", 
+                                                          "You're too close to the screen!")
+                        last_distance_warning_time = current_time
+                    
+                    # Posture checks
+                    if neck_angle < settings["neck_angle_threshold"]:
+                        is_bad_posture = True
+                        posture_type = "forward_head"
+                        
+                        if posture_tracker.should_show_warning():
+                            # Warning with glassmorphism
+                            warn_w = 500
+                            warn_h = 70
+                            warn_x = (w - warn_w) // 2
+                            warn_y = 50
+                            
+                            draw_glass_panel(frame, warn_x, warn_y, warn_w, warn_h, alpha=0.15)
+                            
+                            cv2.putText(frame, "HEAD FORWARD! Sit Up Straight!", 
+                                       (warn_x + 40, warn_y + 45), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.9, 
+                                       (100, 100, 255), 3)
+                            
+                            if not window_focused:
+                                notif_manager.send_notification("Posture Alert", 
+                                                              "Head forward - sit up straight!")
+                    
+                    if shoulder_angle < settings["shoulder_slouch_threshold"]:
+                        is_bad_posture = True
+                        posture_type = "rounded_shoulders"
+                        
+                        if posture_tracker.should_show_warning():
+                            warn_w = 520
+                            warn_h = 70
+                            warn_x = (w - warn_w) // 2
+                            warn_y = 140
+                            
+                            draw_glass_panel(frame, warn_x, warn_y, warn_w, warn_h, alpha=0.15)
+                            
+                            cv2.putText(frame, "SHOULDERS ROUNDED! Roll them back!", 
+                                       (warn_x + 30, warn_y + 45), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.9, 
+                                       (150, 100, 255), 3)
+                            
+                            if not window_focused:
+                                notif_manager.send_notification("Posture Alert", 
+                                                              "Rounded shoulders detected!")
+                    
+                    # Display angles with improved styling
+                    if settings.get("show_landmarks", True):
+                        shoulder_x = int(shoulder_l.x * w)
+                        shoulder_y = int(shoulder_l.y * h)
+                        
+                        # Angle display with background
+                        info_x = shoulder_x + 20
+                        info_y = shoulder_y - 50
+                        info_w = 130
+                        info_h = 60
+                        
+                        # Small info panel
+                        overlay = frame.copy()
+                        cv2.rectangle(overlay, (info_x, info_y), 
+                                    (info_x + info_w, info_y + info_h), 
+                                    (255, 255, 255), -1)
+                        cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+                        cv2.rectangle(frame, (info_x, info_y), 
+                                    (info_x + info_w, info_y + info_h), 
+                                    (200, 200, 200), 2)
+                        
+                        neck_color = (0, 200, 0) if neck_angle >= settings["neck_angle_threshold"] else (0, 0, 255)
+                        cv2.putText(frame, f'Neck: {int(neck_angle)}', 
+                                   (info_x + 10, info_y + 25), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, neck_color, 2)
+                        
+                        shoulder_color = (0, 200, 0) if shoulder_angle >= settings["shoulder_slouch_threshold"] else (0, 0, 255)
+                        cv2.putText(frame, f'Shoulder: {int(shoulder_angle)}', 
+                                   (info_x + 10, info_y + 48), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, shoulder_color, 2)
+                        
+                        # Draw pose landmarks
+                        mp_drawing.draw_landmarks(
+                            frame, result.pose_landmarks[0], POSE_CONNECTIONS,
+                            mp_drawing.DrawingSpec(color=(255, 180, 120), thickness=2, circle_radius=3),
+                            mp_drawing.DrawingSpec(color=(255, 140, 0), thickness=3, circle_radius=2)
+                        )
                 
-                if shoulder_angle < settings["shoulder_slouch_threshold"]:
-                    is_bad_posture = True
-                    posture_type = "rounded_shoulders"
-                    if posture_tracker.should_show_warning():
-                        cv2.putText(frame, "SHOULDERS ROUNDED! Roll them back!", 
-                                   (w // 2 - 280, 160), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 100, 255), 3)
-                        if not window_focused:
-                            notif_manager.send_notification("Posture Alert", 
-                                                           "Rounded shoulders detected!")
-                
-                # Display angles
-                shoulder_x = int(shoulder_l.x * w)
-                shoulder_y = int(shoulder_l.y * h)
-                
-                neck_color = (0, 255, 0) if neck_angle >= settings["neck_angle_threshold"] else (0, 0, 255)
-                cv2.putText(frame, f'Neck: {int(neck_angle)}', 
-                           (shoulder_x + 10, shoulder_y - 30), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, neck_color, 2)
-                
-                shoulder_color = (0, 255, 0) if shoulder_angle >= settings["shoulder_slouch_threshold"] else (0, 0, 255)
-                cv2.putText(frame, f'Shoulder: {int(shoulder_angle)}', 
-                           (shoulder_x + 10, shoulder_y - 10), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, shoulder_color, 2)
-                
-                # Draw pose landmarks
-                mp_drawing.draw_landmarks(
-                    frame, result.pose_landmarks[0], POSE_CONNECTIONS,
-                    mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
-                    mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)
-                )
+                except Exception as e:
+                    print(f"Pose detection error: {e}")
+            
+            # Update posture tracker
+            posture_tracker.update(is_bad_posture, posture_type)
+            
+            # Log bad posture events (every 30 seconds)
+            if is_bad_posture and posture_tracker.should_show_warning():
+                if current_time - last_logged_posture_time > 30:
+                    duration = posture_tracker.get_bad_posture_duration()
+                    logger.log_bad_posture(duration, posture_type or "unknown")
+                    last_logged_posture_time = current_time
+            
+            # Check break timer
+            timer_status = timer.check_timer()
+            
+            if timer_status in ["BREAK_TIME", "ON_BREAK"]:
+                if not timer.break_acknowledged:
+                    draw_break_reminder(frame)
+                    if not window_focused and timer_status == "BREAK_TIME":
+                        notif_manager.send_notification("Break Time!", 
+                                                      "Time for your 20-20-20 break!")
+            
+            # Draw compact overlay (not during break reminder)
+            if timer.break_acknowledged or timer_status not in ["BREAK_TIME", "ON_BREAK"]:
+                compact_overlay.draw(frame, posture_tracker, timer, settings)
+            
+            # Draw settings UI
+            settings_ui.draw(frame)
+            
+            cv2.imshow("PosturePal - Desk Health Monitor", frame)
+            
+            # Keyboard input
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or key == ord('Q'):
+                break
+            elif key == ord(' '):
+                if timer.on_break and not timer.break_acknowledged:
+                    timer.acknowledge_break()
+                    logger.log_break_taken()
+            elif key == ord('s') or key == ord('S'):
+                if settings_ui.show:
+                    # Check if we should save
+                    action = settings_ui.handle_click(0, 0)  # Dummy click to trigger save check
+                    save_settings(settings_ui.settings)
+                    settings = settings_ui.settings.copy()
+                    timer.update_settings(settings["work_interval"], settings["break_duration"])
+                    posture_tracker.warning_duration = settings["posture_warning_duration"]
+                    print("Settings saved!")
+                settings_ui.toggle()
+            elif key == ord('m') or key == ord('M'):
+                # Toggle minimal mode
+                settings["minimal_mode"] = not settings.get("minimal_mode", False)
+                save_settings(settings)
+                print(f"Minimal mode: {'ON' if settings['minimal_mode'] else 'OFF'}")
+            elif key == ord('l') or key == ord('L'):
+                # Toggle landmarks
+                settings["show_landmarks"] = not settings.get("show_landmarks", True)
+                save_settings(settings)
+                print(f"Landmarks: {'ON' if settings['show_landmarks'] else 'OFF'}")
+    
+    cap.release()
+    cv2.destroyAllWindows()
+    
+    # Log session end
+    session_duration = int(time.time() - posture_tracker.last_check_time)
+    logger.log_event("session_end", session_duration, "normal")
+    print(f"\nSession ended. Total bad posture time: {posture_tracker.get_total_bad_posture_minutes()} minutes")
 
-            except Exception as e:
-                pass
-        
-        # Update posture tracker
-        posture_tracker.update(is_bad_posture, posture_type)
-        
-        # Log bad posture events
-        if is_bad_posture and posture_tracker.should_show_warning():
-            duration = posture_tracker.get_bad_posture_duration()
-            if duration > 5:  # Log if bad posture lasts more than 5 seconds
-                logger.log_bad_posture(duration, posture_type or "unknown")
-        
-        # Check break timer
-        timer_status = timer.check_timer()
-        
-        if timer_status in ["BREAK_TIME", "ON_BREAK"]:
-            if not timer.break_acknowledged:
-                draw_break_reminder(frame)
-                if not window_focused and timer_status == "BREAK_TIME":
-                    notif_manager.send_notification("Break Time!", 
-                                                   "Time for your 20-20-20 break!")
-        
-        # Draw compact overlay
-        compact_overlay.draw(frame, posture_tracker, timer)
-        
-        # Draw settings UI
-        settings_ui.draw(frame)
-        
-        cv2.imshow("Desk Health Monitor", frame)
-        
-        # Keyboard input
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
-        elif key == ord(' '):
-            if timer.on_break:
-                timer.acknowledge_break()
-                logger.log_break_taken()
-        elif key == ord('s') or key == ord('S'):
-            if settings_ui.show:
-                # Save settings
-                save_settings(settings_ui.settings)
-                settings = settings_ui.settings.copy()
-                timer.update_settings(settings["work_interval"], settings["break_duration"])
-                posture_tracker.warning_duration = settings["posture_warning_duration"]
-            settings_ui.toggle()
-        elif key == ord('+') or key == ord('='):
-            if settings_ui.show:
-                for i in range(len(settings_ui.fields)):
-                    settings_ui.adjust_value(i, True)
-        elif key == ord('-') or key == ord('_'):
-            if settings_ui.show:
-                for i in range(len(settings_ui.fields)):
-                    settings_ui.adjust_value(i, False)
-        elif key >= ord('1') and key <= ord('6'):
-            if settings_ui.show:
-                field_index = key - ord('1')
-                if field_index < len(settings_ui.fields):
-                    settings_ui.adjust_value(field_index, True)
-
-cap.release()
-cv2.destroyAllWindows()
-logger.log_event("session_end", int(time.time() - posture_tracker.last_check_time), "normal")
+if __name__ == "__main__":
+    main()
