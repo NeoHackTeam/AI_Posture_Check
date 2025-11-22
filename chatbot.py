@@ -23,7 +23,7 @@ def chat():
     # Initialize conversation in session if not already
     if "conversation" not in session:
         session["conversation"] = [
-            {"role": "system", "content": "You are a helpful, friendly assistant."}
+            {"role": "system", "content": "You are a helpful, friendly medical assistant, designed to help with posture and exercises to improve everyday health."}
         ]
 
     # Append user message to conversation
@@ -50,6 +50,7 @@ def clear():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
