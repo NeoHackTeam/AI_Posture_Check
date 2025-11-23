@@ -78,9 +78,9 @@ class PostureAnalyzer:
             return False
         
         # More lenient thresholds for calibration
-        good_neck = 150 <= neck_angle <= 180
-        good_shoulder = 140 <= shoulder_angle <= 180
-        good_back = 140 <= back_angle <= 180
+        good_neck = 160 <= neck_angle <= 180
+        good_shoulder = 155 <= shoulder_angle <= 180
+        good_back = 155 <= back_angle <= 180
         
         if good_neck and good_shoulder and good_back:
             self.calibration_frames += 1
@@ -536,8 +536,8 @@ if __name__ == '__main__':
         exit(1)
     
     print("✓ MediaPipe initialized successfully!")
-    print("\nServer starting on http://localhost:5000")
-    print("Open your browser and navigate to: http://localhost:5000")
+    print("\nServer starting on http://localhost:5001")
+    print("Open your browser and navigate to: http://localhost:5001")
     print("\nTips:")
     print("  - Sit with good posture when calibrating")
     print("  - Calibration takes ~1 second of good posture")
@@ -545,4 +545,4 @@ if __name__ == '__main__':
     print("=" * 60)
     print()
     
-    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=8000, debug=True, threaded=True, use_reloader=False)
