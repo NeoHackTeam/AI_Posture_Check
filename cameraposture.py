@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 import json
 import os
 from collections import deque
+import winsound  # For Windows; use os.system('afplay /System/Library/Sounds/Glass.aiff') on Mac
+from win10toast import ToastNotifier  # Windows notifications
 
 # -------------------------------
 # CONFIG & SETTINGS
@@ -28,12 +30,12 @@ COLORS = {
 }
 
 DEFAULT_SETTINGS = {
-    "work_interval": 20 * 60,
-    "break_duration": 20,
-    "neck_angle_threshold": 155,      # LOWERED: More sensitive to forward head
-    "shoulder_slouch_threshold": 145,  # LOWERED: More sensitive to rounded shoulders
-    "back_angle_threshold": 145,       # LOWERED: More sensitive to slouching
-    "posture_warning_duration": 3,
+    "work_interval": 30,              # 30 seconds for demo
+    "break_duration": 5,              # 5 seconds for demo
+    "neck_angle_threshold": 155,
+    "shoulder_slouch_threshold": 145,
+    "back_angle_threshold": 145,
+    "posture_warning_duration": 10,   # Notify after 10 seconds
     "face_distance_threshold": 0.25,
     "model_path": "pose_landmarker_full.task",
     "show_landmarks": True,
@@ -53,6 +55,100 @@ def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
         json.dump(settings, f, indent=2)
 
+def play_sound():
+    """Cross-platform sound alert"""
+    try:
+        if os.name == 'nt':  # Windows
+            winsound.Beep(1000, 500)
+        else:  # Mac/Linux
+            os.system('afplay /System/Library/Sounds/Glass.aiff')
+    except:
+        pass
+
+# -------------------------------
+# TIMER MANAGER
+# -------------------------------
+class TimerManager:
+    def __init__(self, work_duration, break_duration, sound_enabled=True):
+        self.work_duration = work_duration
+        self.break_duration = break_duration
+        self.sound_enabled = sound_enabled
+        
+        self.is_working = True
+        self.session_start = time.time()
+        self.current_phase_start = time.time()
+        self.paused = False
+        self.pause_time = 0
+        
+        self.total_work_time = 0
+        self.total_break_time = 0
+        self.sessions_completed = 0
+    
+    def get_elapsed_time(self):
+        """Get elapsed time in current phase"""
+        if self.paused:
+            return self.pause_time
+        elapsed = time.time() - self.current_phase_start
+        return elapsed
+    
+    def get_remaining_time(self):
+        """Get remaining time in current phase"""
+        if self.is_working:
+            remaining = self.work_duration - self.get_elapsed_time()
+        else:
+            remaining = self.break_duration - self.get_elapsed_time()
+        return max(0, remaining)
+    
+    def get_phase_status(self):
+        """Check if phase should switch"""
+        elapsed = self.get_elapsed_time()
+        if self.is_working and elapsed >= self.work_duration:
+            self.switch_to_break()
+            return "switched_to_break"
+        elif not self.is_working and elapsed >= self.break_duration:
+            self.switch_to_work()
+            return "switched_to_work"
+        return "ongoing"
+    
+    def switch_to_break(self):
+        """Switch to break phase"""
+        if self.is_working:
+            self.total_work_time += self.work_duration
+            self.is_working = False
+            self.current_phase_start = time.time()
+            self.paused = False
+            if self.sound_enabled:
+                play_sound()
+    
+    def switch_to_work(self):
+        """Switch to work phase"""
+        if not self.is_working:
+            self.total_break_time += self.break_duration
+            self.sessions_completed += 1
+            self.is_working = True
+            self.current_phase_start = time.time()
+            self.paused = False
+            if self.sound_enabled:
+                play_sound()
+    
+    def toggle_pause(self):
+        """Pause/resume timer"""
+        if self.paused:
+            self.current_phase_start = time.time() - self.pause_time
+            self.paused = False
+        else:
+            self.pause_time = self.get_elapsed_time()
+            self.paused = True
+    
+    def format_time(self, seconds):
+        """Format seconds to MM:SS"""
+        mins = int(seconds) // 60
+        secs = int(seconds) % 60
+        return f"{mins:02d}:{secs:02d}"
+    
+    def get_phase_name(self):
+        return "WORK" if self.is_working else "BREAK"
+
 # -------------------------------
 # ADVANCED POSTURE ANALYZER
 # -------------------------------
@@ -66,9 +162,8 @@ class AdvancedPostureAnalyzer:
             "calibration_complete": False
         }
         self.calibration_frames = 0
-        self.calibration_target = 60  # 60 frames (~2 seconds) of good posture
+        self.calibration_target = 60
         
-        # Smoothing buffers - REDUCED for faster detection
         self.neck_angle_history = deque(maxlen=8)
         self.shoulder_angle_history = deque(maxlen=8)
         self.back_angle_history = deque(maxlen=8)
@@ -93,12 +188,18 @@ class AdvancedPostureAnalyzer:
             "too_close": None
         }
         
+        self.notification_sent = {
+            "forward_head": False,
+            "rounded_shoulders": False,
+            "slouched_back": False,
+            "too_close": False
+        }
+        
     def calibrate(self, neck_angle, shoulder_angle, back_angle):
         """Calibration mode - user sits with good posture for 2 seconds"""
         if not self.calibration_enabled or self.calibration_data["calibration_complete"]:
             return False
         
-        # Check if angles are in "good" range (relatively straight)
         good_neck = 155 <= neck_angle <= 180
         good_shoulder = 145 <= shoulder_angle <= 180
         good_back = 145 <= back_angle <= 180
@@ -106,7 +207,6 @@ class AdvancedPostureAnalyzer:
         if good_neck and good_shoulder and good_back:
             self.calibration_frames += 1
             
-            # Average the angles
             if self.calibration_data["neck_baseline"] is None:
                 self.calibration_data["neck_baseline"] = []
                 self.calibration_data["shoulder_baseline"] = []
@@ -117,14 +217,12 @@ class AdvancedPostureAnalyzer:
             self.calibration_data["back_baseline"].append(back_angle)
             
             if self.calibration_frames >= self.calibration_target:
-                # Calculate averages
                 self.calibration_data["neck_baseline"] = np.mean(self.calibration_data["neck_baseline"])
                 self.calibration_data["shoulder_baseline"] = np.mean(self.calibration_data["shoulder_baseline"])
                 self.calibration_data["back_baseline"] = np.mean(self.calibration_data["back_baseline"])
                 self.calibration_data["calibration_complete"] = True
                 return True
         else:
-            # Reset if posture breaks
             self.calibration_frames = 0
             self.calibration_data["neck_baseline"] = None
             self.calibration_data["shoulder_baseline"] = None
@@ -140,27 +238,20 @@ class AdvancedPostureAnalyzer:
     
     def analyze_posture(self, neck_angle, shoulder_angle, back_angle, face_distance, 
                        settings, current_time):
-        """
-        Analyze posture using smoothed angles and return detailed info
-        Returns: (issues_dict, is_bad_posture, primary_issue)
-        """
+        """Analyze posture using smoothed angles and return detailed info"""
         
-        # Add to history for smoothing
         self.neck_angle_history.append(neck_angle)
         self.shoulder_angle_history.append(shoulder_angle)
         self.back_angle_history.append(back_angle)
         
-        # Calculate smoothed angles (median of history for robustness)
         smooth_neck = np.median(self.neck_angle_history) if len(self.neck_angle_history) > 0 else neck_angle
         smooth_shoulder = np.median(self.shoulder_angle_history) if len(self.shoulder_angle_history) > 0 else shoulder_angle
         smooth_back = np.median(self.back_angle_history) if len(self.back_angle_history) > 0 else back_angle
         
-        # Get thresholds (use calibration if available)
         neck_threshold = settings["neck_angle_threshold"]
         shoulder_threshold = settings["shoulder_slouch_threshold"]
         back_threshold = settings.get("back_angle_threshold", 160)
         
-        # Adjust thresholds based on calibration
         if self.calibration_data["calibration_complete"]:
             neck_threshold = self.calibration_data["neck_baseline"] - 5
             shoulder_threshold = self.calibration_data["shoulder_baseline"] - 5
@@ -168,9 +259,9 @@ class AdvancedPostureAnalyzer:
         
         issues = {}
         primary_issue = None
+        notification_triggered = False
+        warning_duration = settings["posture_warning_duration"]
         
-        # --- FORWARD HEAD DETECTION ---
-        # Forward head happens when ear-shoulder-hip angle decreases
         is_forward_head = smooth_neck < neck_threshold
         issues["forward_head"] = is_forward_head
         
@@ -178,14 +269,18 @@ class AdvancedPostureAnalyzer:
             if self.issue_start_times["forward_head"] is None:
                 self.issue_start_times["forward_head"] = current_time
             primary_issue = "forward_head"
+            
+            duration = current_time - self.issue_start_times["forward_head"]
+            if duration > warning_duration and not self.notification_sent["forward_head"]:
+                notification_triggered = True
+                self.notification_sent["forward_head"] = True
         else:
             if self.issue_start_times["forward_head"] is not None:
                 duration = current_time - self.issue_start_times["forward_head"]
                 self.posture_durations["forward_head"] += duration
             self.issue_start_times["forward_head"] = None
+            self.notification_sent["forward_head"] = False
         
-        # --- ROUNDED SHOULDERS DETECTION ---
-        # Rounded shoulders = angle between ear-shoulder-elbow decreases
         is_rounded_shoulders = smooth_shoulder < shoulder_threshold
         issues["rounded_shoulders"] = is_rounded_shoulders
         
@@ -194,14 +289,18 @@ class AdvancedPostureAnalyzer:
                 self.issue_start_times["rounded_shoulders"] = current_time
             if primary_issue is None:
                 primary_issue = "rounded_shoulders"
+            
+            duration = current_time - self.issue_start_times["rounded_shoulders"]
+            if duration > warning_duration and not self.notification_sent["rounded_shoulders"]:
+                notification_triggered = True
+                self.notification_sent["rounded_shoulders"] = True
         else:
             if self.issue_start_times["rounded_shoulders"] is not None:
                 duration = current_time - self.issue_start_times["rounded_shoulders"]
                 self.posture_durations["rounded_shoulders"] += duration
             self.issue_start_times["rounded_shoulders"] = None
+            self.notification_sent["rounded_shoulders"] = False
         
-        # --- SLOUCHED BACK DETECTION ---
-        # Slouched back = shoulder-hip-knee angle decreases (spine curves)
         is_slouched = smooth_back < back_threshold
         issues["slouched_back"] = is_slouched
         
@@ -210,24 +309,35 @@ class AdvancedPostureAnalyzer:
                 self.issue_start_times["slouched_back"] = current_time
             if primary_issue is None:
                 primary_issue = "slouched_back"
+            
+            duration = current_time - self.issue_start_times["slouched_back"]
+            if duration > warning_duration and not self.notification_sent["slouched_back"]:
+                notification_triggered = True
+                self.notification_sent["slouched_back"] = True
         else:
             if self.issue_start_times["slouched_back"] is not None:
                 duration = current_time - self.issue_start_times["slouched_back"]
                 self.posture_durations["slouched_back"] += duration
             self.issue_start_times["slouched_back"] = None
+            self.notification_sent["slouched_back"] = False
         
-        # --- DISTANCE CHECK ---
         too_close = face_distance > settings["face_distance_threshold"]
         issues["too_close"] = too_close
         
         if too_close:
             if self.issue_start_times["too_close"] is None:
                 self.issue_start_times["too_close"] = current_time
+            
+            duration = current_time - self.issue_start_times["too_close"]
+            if duration > warning_duration and not self.notification_sent["too_close"]:
+                notification_triggered = True
+                self.notification_sent["too_close"] = True
         else:
             if self.issue_start_times["too_close"] is not None:
                 duration = current_time - self.issue_start_times["too_close"]
                 self.posture_durations["too_close"] += duration
             self.issue_start_times["too_close"] = None
+            self.notification_sent["too_close"] = False
         
         is_bad_posture = any(issues.values())
         
@@ -235,6 +345,8 @@ class AdvancedPostureAnalyzer:
             "issues": issues,
             "is_bad": is_bad_posture,
             "primary_issue": primary_issue,
+            "notification_triggered": notification_triggered,
+            "notification_issue": primary_issue,
             "smooth_angles": {
                 "neck": smooth_neck,
                 "shoulder": smooth_shoulder,
@@ -307,6 +419,38 @@ def draw_modern_panel(frame, x, y, width, height, color=COLORS["light_blue"], al
 def put_text(frame, text, org, font_scale=0.6, color=COLORS["dark_gray"], thickness=2):
     """Put text with antialiasing"""
     cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness, cv2.LINE_AA)
+
+def draw_timer_widget(frame, timer, w, h):
+    """Draw work/break timer widget"""
+    panel_x = w - 300
+    panel_y = 20
+    panel_w = 280
+    panel_h = 120
+    
+    draw_modern_panel(frame, panel_x, panel_y, panel_w, panel_h,
+                     color=COLORS["light_blue"], alpha=0.2, border_width=2)
+    
+    # Phase name
+    phase = timer.get_phase_name()
+    phase_color = COLORS["green"] if timer.is_working else COLORS["warning_orange"]
+    put_text(frame, phase, (panel_x + 80, panel_y + 35),
+            font_scale=0.9, color=phase_color, thickness=2)
+    
+    # Time remaining
+    remaining = timer.get_remaining_time()
+    time_str = timer.format_time(remaining)
+    put_text(frame, time_str, (panel_x + 50, panel_y + 75),
+            font_scale=1.2, color=COLORS["primary_blue"], thickness=2)
+    
+    # Pause indicator
+    pause_text = "⏸ PAUSED" if timer.paused else ""
+    if pause_text:
+        put_text(frame, pause_text, (panel_x + 60, panel_y + 105),
+                font_scale=0.5, color=COLORS["red"], thickness=1)
+    
+    # Sessions completed
+    put_text(frame, f"✓ Sessions: {timer.sessions_completed}", (panel_x + 10, h - 30),
+            font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
 
 def draw_posture_analysis_panel(frame, analysis, w, h):
     """Draw detailed posture analysis on screen"""
@@ -384,12 +528,10 @@ def draw_calibration_screen(frame, progress):
     """Draw calibration instructions"""
     h, w, _ = frame.shape
     
-    # Overlay
     overlay = frame.copy()
     cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 0), -1)
     cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
     
-    # Panel
     panel_w = 500
     panel_h = 300
     panel_x = (w - panel_w) // 2
@@ -398,17 +540,14 @@ def draw_calibration_screen(frame, progress):
     draw_modern_panel(frame, panel_x, panel_y, panel_w, panel_h,
                      color=COLORS["light_blue"], alpha=0.3, border_width=3)
     
-    # Title
     put_text(frame, "CALIBRATION MODE", (panel_x + 100, panel_y + 50),
             font_scale=1.0, color=COLORS["primary_blue"], thickness=2)
     
-    # Instructions
     put_text(frame, "Sit with good posture for", (panel_x + 80, panel_y + 100),
             font_scale=0.7, color=COLORS["dark_gray"], thickness=2)
     put_text(frame, "2 seconds to calibrate", (panel_x + 110, panel_y + 130),
             font_scale=0.7, color=COLORS["dark_gray"], thickness=2)
     
-    # Progress bar
     bar_w = 300
     bar_h = 20
     bar_x = panel_x + (panel_w - bar_w) // 2
@@ -424,20 +563,58 @@ def draw_calibration_screen(frame, progress):
     cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h),
                  COLORS["primary_blue"], 2)
     
-    # Percentage
     put_text(frame, f"{progress}%", (bar_x + bar_w + 20, bar_y + bar_h),
             font_scale=0.7, color=COLORS["primary_blue"], thickness=2)
     
-    # Completion message
     if progress == 100:
         put_text(frame, "✓ CALIBRATION COMPLETE!", (panel_x + 80, panel_y + 250),
                 font_scale=0.85, color=COLORS["green"], thickness=2)
+
+def draw_break_screen(frame, timer):
+    """Draw break time screen with stretches"""
+    h, w, _ = frame.shape
+    
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, 0), (w, h), (100, 180, 255), -1)
+    cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+    
+    panel_w = 600
+    panel_h = 400
+    panel_x = (w - panel_w) // 2
+    panel_y = (h - panel_h) // 2
+    
+    draw_modern_panel(frame, panel_x, panel_y, panel_w, panel_h,
+                     color=COLORS["warning_orange"], alpha=0.3, border_width=3)
+    
+    put_text(frame, "BREAK TIME!", (panel_x + 200, panel_y + 50),
+            font_scale=1.2, color=COLORS["warning_orange"], thickness=3)
+    
+    remaining = timer.get_remaining_time()
+    time_str = timer.format_time(remaining)
+    put_text(frame, time_str, (panel_x + 180, panel_y + 120),
+            font_scale=2.0, color=COLORS["white"], thickness=3)
+    
+    # Stretch tips
+    put_text(frame, "Quick Tips:", (panel_x + 50, panel_y + 200),
+            font_scale=0.8, color=COLORS["white"], thickness=2)
+    
+    tips = [
+        "• Neck rolls: Rotate your neck gently",
+        "• Shoulder shrugs: Lift shoulders to ears",
+        "• Stand and stretch: Reach arms upward",
+        "• Eye break: Look away from screen"
+    ]
+    
+    y_pos = panel_y + 240
+    for tip in tips:
+        put_text(frame, tip, (panel_x + 50, y_pos),
+                font_scale=0.6, color=COLORS["white"], thickness=1)
+        y_pos += 30
 
 def draw_skeleton_with_angles(frame, landmarks, mp_pose, analysis):
     """Draw skeleton with angle indicators"""
     h, w, _ = frame.shape
     
-    # Draw connections
     connections = [
         (mp_pose.PoseLandmark.LEFT_EAR.value, mp_pose.PoseLandmark.LEFT_SHOULDER.value),
         (mp_pose.PoseLandmark.LEFT_SHOULDER.value, mp_pose.PoseLandmark.LEFT_HIP.value),
@@ -457,7 +634,6 @@ def draw_skeleton_with_angles(frame, landmarks, mp_pose, analysis):
         color = COLORS["green"] if not analysis["is_bad"] else COLORS["red"]
         cv2.line(frame, start_pos, end_pos, color, 3)
     
-    # Draw circles at joints
     joint_indices = [
         mp_pose.PoseLandmark.LEFT_EAR.value,
         mp_pose.PoseLandmark.LEFT_SHOULDER.value,
@@ -475,6 +651,33 @@ def draw_skeleton_with_angles(frame, landmarks, mp_pose, analysis):
         color = COLORS["primary_blue"]
         cv2.circle(frame, pos, 6, color, -1)
         cv2.circle(frame, pos, 6, COLORS["white"], 2)
+
+def draw_help_overlay(frame):
+    """Draw keyboard help overlay"""
+    h, w, _ = frame.shape
+    
+    help_x = 20
+    help_y = h - 150
+    help_w = 300
+    help_h = 130
+    
+    draw_modern_panel(frame, help_x, help_y, help_w, help_h,
+                     color=COLORS["light_gray"], alpha=0.2, border_width=1)
+    
+    put_text(frame, "KEYBOARD CONTROLS", (help_x + 20, help_y + 20),
+            font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
+    
+    controls = [
+        "C - Calibrate  S - Skip",
+        "SPACE - Pause  Q - Quit",
+        "H - Hide Help"
+    ]
+    
+    y_pos = help_y + 45
+    for control in controls:
+        put_text(frame, control, (help_x + 15, y_pos),
+                font_scale=0.45, color=COLORS["dark_gray"], thickness=1)
+        y_pos += 25
 
 # =============================
 # MAIN APPLICATION
@@ -508,13 +711,16 @@ def main():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
-    # Initialize posture analyzer
+    # Initialize components
     posture_analyzer = AdvancedPostureAnalyzer(calibration_enabled=True)
+    timer = TimerManager(settings["work_interval"], settings["break_duration"], 
+                        sound_enabled=settings["sound_enabled"])
     
     cv2.namedWindow("PosturePal - Posture Detection")
     
     print("PosturePal Started!")
     print("Press 'C' to calibrate, 'Q' to quit, 'S' to skip calibration")
+    print("Press 'SPACE' to pause/resume the timer")
     print("=" * 60)
     
     calibration_mode = True
@@ -522,6 +728,7 @@ def main():
     fps_clock = time.time()
     fps_counter = 0
     current_fps = 0
+    show_help = True
     
     with PoseLandmarker.create_from_options(options) as landmarker:
         mp_pose = mp.solutions.pose
@@ -549,13 +756,15 @@ def main():
             
             current_time = time.time()
             
+            # Check timer phase transitions
+            phase_status = timer.get_phase_status()
+            
             # If calibration needed
             if calibration_mode and not posture_analyzer.calibration_data["calibration_complete"]:
                 if result.pose_landmarks and len(result.pose_landmarks) > 0:
                     landmarks = result.pose_landmarks[0]
                     
                     try:
-                        # Calculate angles
                         ear_l = landmarks[mp_pose.PoseLandmark.LEFT_EAR.value]
                         shoulder_l = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
                         hip_l = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
@@ -566,7 +775,6 @@ def main():
                         shoulder_angle = calculate_angle(ear_l, shoulder_l, elbow_l)
                         back_angle = calculate_back_angle(shoulder_l, hip_l, knee_l)
                         
-                        # Attempt calibration
                         cal_complete = posture_analyzer.calibrate(neck_angle, shoulder_angle, back_angle)
                         
                         if cal_complete:
@@ -582,13 +790,17 @@ def main():
                 progress = posture_analyzer.get_calibration_progress()
                 draw_calibration_screen(frame, progress)
             
-            # Posture analysis (after calibration or if skipped)
+            # Posture analysis
             else:
-                if result.pose_landmarks and len(result.pose_landmarks) > 0:
+                # Draw break screen if in break mode
+                if not timer.is_working:
+                    draw_break_screen(frame, timer)
+                
+                # Draw posture analysis if in work mode or timer not paused
+                elif result.pose_landmarks and len(result.pose_landmarks) > 0:
                     landmarks = result.pose_landmarks[0]
                     
                     try:
-                        # Calculate angles
                         ear_l = landmarks[mp_pose.PoseLandmark.LEFT_EAR.value]
                         shoulder_l = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
                         hip_l = landmarks[mp_pose.PoseLandmark.LEFT_HIP.value]
@@ -600,19 +812,27 @@ def main():
                         back_angle = calculate_back_angle(shoulder_l, hip_l, knee_l)
                         face_distance = calculate_face_distance(landmarks, mp_pose)
                         
-                        # Analyze posture
                         analysis = posture_analyzer.analyze_posture(
                             neck_angle, shoulder_angle, back_angle, 
                             face_distance, settings, current_time
                         )
                         
-                        # Draw analysis panel
-                        draw_posture_analysis_panel(frame, analysis, w, h)
+                        # Send Windows notification if bad posture detected for 10+ seconds
+                        if analysis["notification_triggered"]:
+                            try:
+                                toast = ToastNotifier()
+                                issue_name = analysis["notification_issue"].replace("_", " ").title()
+                                toast.show_toast("PosturePal Alert", 
+                                               f"Bad posture detected: {issue_name}",
+                                               duration=5,
+                                               threaded=True)
+                                print(f"Notification sent: {issue_name} detected for 10+ seconds")
+                            except Exception as e:
+                                print(f"Notification error: {e}")
                         
-                        # Draw skeleton
+                        draw_posture_analysis_panel(frame, analysis, w, h)
                         draw_skeleton_with_angles(frame, landmarks, mp_pose, analysis)
                         
-                        # Draw warning if bad posture
                         if analysis["is_bad"]:
                             warn_text = analysis["primary_issue"].replace("_", " ").upper()
                             warn_w = 350
@@ -630,9 +850,17 @@ def main():
                     except Exception as e:
                         print(f"Analysis error: {e}")
             
+            # Draw timer widget (always visible except calibration)
+            if not calibration_mode:
+                draw_timer_widget(frame, timer, w, h)
+            
             # Draw FPS
             put_text(frame, f"FPS: {current_fps}", (w - 120, 30),
                     font_scale=0.6, color=COLORS["primary_blue"], thickness=2)
+            
+            # Draw help overlay
+            if show_help:
+                draw_help_overlay(frame)
             
             cv2.imshow("PosturePal - Posture Detection", frame)
             
@@ -653,6 +881,12 @@ def main():
             elif key == ord('s') or key == ord('S'):
                 print("\n⏭️  Skipping calibration, using default thresholds...")
                 calibration_mode = False
+            elif key == 32:  # SPACE
+                timer.toggle_pause()
+                state = "PAUSED" if timer.paused else "RESUMED"
+                print(f"\n⏸️  Timer {state}")
+            elif key == ord('h') or key == ord('H'):
+                show_help = not show_help
     
     cap.release()
     cv2.destroyAllWindows()
@@ -661,6 +895,9 @@ def main():
     print("\n" + "=" * 60)
     print("SESSION SUMMARY")
     print("=" * 60)
+    print(f"Sessions Completed: {timer.sessions_completed}")
+    print(f"Total Work Time: {timer.total_work_time/60:.1f}m")
+    print(f"Total Break Time: {timer.total_break_time/60:.1f}m")
     print(f"Forward Head Time: {posture_analyzer.get_total_issue_time('forward_head')/60:.1f}m")
     print(f"Rounded Shoulders Time: {posture_analyzer.get_total_issue_time('rounded_shoulders')/60:.1f}m")
     print(f"Slouched Back Time: {posture_analyzer.get_total_issue_time('slouched_back')/60:.1f}m")
