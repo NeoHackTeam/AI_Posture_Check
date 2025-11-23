@@ -476,20 +476,21 @@ def draw_timer_widget(frame, timer, w, h):
             font_scale=1.2, color=COLORS["primary_blue"], thickness=2)
     
     # Pause indicator
-    pause_text = "⏸ PAUSED" if timer.paused else ""
+    pause_text = "PAUSED" if timer.paused else ""
     if pause_text:
         put_text(frame, pause_text, (panel_x + 60, panel_y + 105),
                 font_scale=0.5, color=COLORS["red"], thickness=1)
     
     # Sessions completed
-    put_text(frame, f"✓ Sessions: {timer.sessions_completed}", (panel_x + 10, h - 30),
+    put_text(frame, f"Sessions: {timer.sessions_completed}", (panel_x + 10, h - 30),
             font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
 
 def draw_posture_analysis_panel(frame, analysis, w, h):
     """Draw detailed posture analysis on screen"""
     panel_x = 20
     panel_y = 20
-    panel_w = 380
+    # Increased panel width from 380 to 420
+    panel_w = 420 
     panel_h = 280
     
     draw_modern_panel(frame, panel_x, panel_y, panel_w, panel_h, 
@@ -505,14 +506,15 @@ def draw_posture_analysis_panel(frame, analysis, w, h):
     neck_raw = analysis["raw_angles"]["neck"]
     neck_smooth = analysis["smooth_angles"]["neck"]
     neck_threshold = analysis["thresholds"]["neck"]
-    neck_status = "✓" if neck_raw >= neck_threshold else "✗"
+    neck_status = "OK" if neck_raw >= neck_threshold else "BAD"
     neck_color = COLORS["green"] if neck_raw >= neck_threshold else COLORS["red"]
     
     put_text(frame, f"Neck {neck_status}", (panel_x + 15, y_offset), 
             font_scale=0.65, color=COLORS["dark_gray"], thickness=2)
-    put_text(frame, f"Raw: {int(neck_raw)}° | Smooth: {int(neck_smooth)}°", 
-            (panel_x + 150, y_offset), font_scale=0.55, color=neck_color, thickness=1)
-    put_text(frame, f"Threshold: {int(neck_threshold)}°", 
+    # Moved the raw/smooth text further right for alignment
+    put_text(frame, f"Raw: {int(neck_raw)}deg | Smooth: {int(neck_smooth)}deg", 
+            (panel_x + 180, y_offset), font_scale=0.55, color=neck_color, thickness=1)
+    put_text(frame, f"Threshold: {int(neck_threshold)}deg", 
             (panel_x + 15, y_offset + 20), font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
     
     # SHOULDERS
@@ -520,14 +522,15 @@ def draw_posture_analysis_panel(frame, analysis, w, h):
     shoulder_raw = analysis["raw_angles"]["shoulder"]
     shoulder_smooth = analysis["smooth_angles"]["shoulder"]
     shoulder_threshold = analysis["thresholds"]["shoulder"]
-    shoulder_status = "✓" if shoulder_raw >= shoulder_threshold else "✗"
+    shoulder_status = "OK" if shoulder_raw >= shoulder_threshold else "BAD"
     shoulder_color = COLORS["green"] if shoulder_raw >= shoulder_threshold else COLORS["red"]
     
     put_text(frame, f"Shoulders {shoulder_status}", (panel_x + 15, y_offset), 
             font_scale=0.65, color=COLORS["dark_gray"], thickness=2)
-    put_text(frame, f"Raw: {int(shoulder_raw)}° | Smooth: {int(shoulder_smooth)}°", 
-            (panel_x + 150, y_offset), font_scale=0.55, color=shoulder_color, thickness=1)
-    put_text(frame, f"Threshold: {int(shoulder_threshold)}°", 
+    # Moved the raw/smooth text further right for alignment
+    put_text(frame, f"Raw: {int(shoulder_raw)}deg | Smooth: {int(shoulder_smooth)}deg", 
+            (panel_x + 180, y_offset), font_scale=0.55, color=shoulder_color, thickness=1)
+    put_text(frame, f"Threshold: {int(shoulder_threshold)}deg", 
             (panel_x + 15, y_offset + 20), font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
     
     # BACK
@@ -535,14 +538,15 @@ def draw_posture_analysis_panel(frame, analysis, w, h):
     back_raw = analysis["raw_angles"]["back"]
     back_smooth = analysis["smooth_angles"]["back"]
     back_threshold = analysis["thresholds"]["back"]
-    back_status = "✓" if back_raw >= back_threshold else "✗"
+    back_status = "OK" if back_raw >= back_threshold else "BAD"
     back_color = COLORS["green"] if back_raw >= back_threshold else COLORS["red"]
     
     put_text(frame, f"Back {back_status}", (panel_x + 15, y_offset), 
             font_scale=0.65, color=COLORS["dark_gray"], thickness=2)
-    put_text(frame, f"Raw: {int(back_raw)}° | Smooth: {int(back_smooth)}°", 
-            (panel_x + 150, y_offset), font_scale=0.55, color=back_color, thickness=1)
-    put_text(frame, f"Threshold: {int(back_threshold)}°", 
+    # Moved the raw/smooth text further right for alignment
+    put_text(frame, f"Raw: {int(back_raw)}deg | Smooth: {int(back_smooth)}deg", 
+            (panel_x + 180, y_offset), font_scale=0.55, color=back_color, thickness=1)
+    put_text(frame, f"Threshold: {int(back_threshold)}deg", 
             (panel_x + 15, y_offset + 20), font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
     
     # STATUS
@@ -600,7 +604,7 @@ def draw_calibration_screen(frame, progress):
             font_scale=0.7, color=COLORS["primary_blue"], thickness=2)
     
     if progress == 100:
-        put_text(frame, "✓ CALIBRATION COMPLETE!", (panel_x + 80, panel_y + 250),
+        put_text(frame, "CALIBRATION COMPLETE!", (panel_x + 80, panel_y + 250),
                 font_scale=0.85, color=COLORS["green"], thickness=2)
 
 def draw_break_screen(frame, timer):
@@ -632,10 +636,10 @@ def draw_break_screen(frame, timer):
             font_scale=0.8, color=COLORS["white"], thickness=2)
     
     tips = [
-        "• Neck rolls: Rotate your neck gently",
-        "• Shoulder shrugs: Lift shoulders to ears",
-        "• Stand and stretch: Reach arms upward",
-        "• Eye break: Look away from screen"
+        "- Neck rolls: Rotate your neck gently",
+        "- Shoulder shrugs: Lift shoulders to ears",
+        "- Stand and stretch: Reach arms upward",
+        "- Eye break: Look away from screen"
     ]
     
     y_pos = panel_y + 240
@@ -758,9 +762,10 @@ def main():
     
     calibration_mode = True
     timestamp = 0
-    fps_clock = time.time()
-    fps_counter = 0
-    current_fps = 0
+    # Removed FPS variables initialization
+    # fps_clock = time.time()
+    # fps_counter = 0
+    # current_fps = 0
     show_help = True
     
     with PoseLandmarker.create_from_options(options) as landmarker:
@@ -774,12 +779,13 @@ def main():
             frame = cv2.flip(frame, 1)
             h, w, _ = frame.shape
             
-            # FPS calculation
-            fps_counter += 1
-            if time.time() - fps_clock > 1:
-                current_fps = fps_counter
-                fps_counter = 0
-                fps_clock = time.time()
+            # Removed FPS calculation block
+            # # FPS calculation
+            # fps_counter += 1
+            # if time.time() - fps_clock > 1:
+            #     current_fps = fps_counter
+            #     fps_counter = 0
+            #     fps_clock = time.time()
             
             # Process frame
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -811,10 +817,10 @@ def main():
                         cal_complete = posture_analyzer.calibrate(neck_angle, shoulder_angle, back_angle)
                         
                         if cal_complete:
-                            print("\n✓ CALIBRATION COMPLETE!")
-                            print(f"  Neck baseline: {posture_analyzer.calibration_data['neck_baseline']:.1f}°")
-                            print(f"  Shoulder baseline: {posture_analyzer.calibration_data['shoulder_baseline']:.1f}°")
-                            print(f"  Back baseline: {posture_analyzer.calibration_data['back_baseline']:.1f}°")
+                            print("\nCALIBRATION COMPLETE!")
+                            print(f"  Neck baseline: {posture_analyzer.calibration_data['neck_baseline']:.1f}deg")
+                            print(f"  Shoulder baseline: {posture_analyzer.calibration_data['shoulder_baseline']:.1f}deg")
+                            print(f"  Back baseline: {posture_analyzer.calibration_data['back_baseline']:.1f}deg")
                             print("=" * 60)
                     
                     except Exception as e:
@@ -877,7 +883,7 @@ def main():
                             draw_modern_panel(frame, warn_x, warn_y, warn_w, warn_h,
                                             color=COLORS["red"], alpha=0.2, border_width=2)
                             
-                            put_text(frame, f"⚠ {warn_text}", 
+                            put_text(frame, f"WARNING: {warn_text}", 
                                     (warn_x + 50, warn_y + 40),
                                     font_scale=0.8, color=COLORS["red"], thickness=2)
                     
@@ -888,9 +894,10 @@ def main():
             if not calibration_mode:
                 draw_timer_widget(frame, timer, w, h)
             
-            # Draw FPS
-            put_text(frame, f"FPS: {current_fps}", (w - 120, 30),
-                    font_scale=0.6, color=COLORS["primary_blue"], thickness=2)
+            #k
+            # # Draw FPS
+            # put_text(frame, f"FPS: {current_fps}", (w - 120, 30),
+            #         font_scale=0.6, color=COLORS["primary_blue"], thickness=2)
             
             # Draw help overlay
             if show_help:
@@ -903,7 +910,7 @@ def main():
             if key == ord('q') or key == ord('Q'):
                 break
             elif key == ord('c') or key == ord('C'):
-                print("\n🔄 Restarting calibration...")
+                print("\nRestarting calibration...")
                 posture_analyzer.calibration_frames = 0
                 posture_analyzer.calibration_data = {
                     "neck_baseline": None,
@@ -913,12 +920,12 @@ def main():
                 }
                 calibration_mode = True
             elif key == ord('s') or key == ord('S'):
-                print("\n⏭️  Skipping calibration, using default thresholds...")
+                print("\nSkipping calibration, using default thresholds...")
                 calibration_mode = False
             elif key == 32:  # SPACE
                 timer.toggle_pause()
                 state = "PAUSED" if timer.paused else "RESUMED"
-                print(f"\n⏸️  Timer {state}")
+                print(f"\nTimer {state}")
             elif key == ord('h') or key == ord('H'):
                 show_help = not show_help
     
@@ -940,3 +947,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
