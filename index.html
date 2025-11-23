@@ -342,43 +342,40 @@
     </footer>
 
     <!-- CHATBOT WIDGET START -->
-    <!-- This is the container for your future Chatbot integration -->
+<!-- Floating Button -->
+<button onclick="toggleChat()" class="chat-bubble bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition">
+    <i class="fa-solid fa-message text-xl"></i>
+</button>
+
+<!-- Chat Window -->
+<div id="chat-window" class="chat-window">
+    <!-- Chat Header -->
+    <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
+        <div class="font-bold"><i class="fa-solid fa-robot mr-2"></i>PostureBot AI</div>
+        <button onclick="toggleChat()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-times"></i></button>
+    </div>
     
-    <!-- Floating Button -->
-    <button onclick="toggleChat()" class="chat-bubble bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110">
-        <i class="fa-solid fa-message text-xl"></i>
-    </button>
-
-    <!-- Chat Window -->
-    <div id="chat-window" class="chat-window">
-        <!-- Chat Header -->
-        <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
-            <div class="font-bold"><i class="fa-solid fa-robot mr-2"></i>PostureBot AI</div>
-            <button onclick="toggleChat()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-times"></i></button>
-        </div>
-        
-        <!-- Chat Messages Area -->
-        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-3">
-            <!-- Initial Greeting -->
-            <div class="flex justify-start">
-                <div class="bg-white border border-slate-200 text-slate-700 rounded-lg rounded-tl-none px-4 py-2 text-sm shadow-sm max-w-[80%]">
-                    Hi! I'm your posture assistant. Ask me about ergonomic setups or how to configure the app!
-                </div>
-            </div>
-            <!-- Dynamic messages will be injected here via JS later -->
-        </div>
-
-        <!-- Input Area -->
-        <div class="p-3 bg-white border-t border-slate-200">
-            <div class="flex gap-2">
-                <input type="text" placeholder="Type a message..." class="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-indigo-500 text-sm">
-                <button class="bg-indigo-600 text-white px-3 py-2 rounded-md hover:bg-indigo-700">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
+    <!-- Chat Messages Area -->
+    <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-3">
+        <!-- Initial Greeting -->
+        <div class="flex justify-start">
+            <div class="bg-white border border-slate-200 text-slate-700 rounded-lg rounded-tl-none px-4 py-2 text-sm shadow-sm max-w-[80%]">
+                Hi! I'm your posture assistant. Ask me about ergonomic setups or exercises to improve your posture!
             </div>
         </div>
     </div>
-    <!-- CHATBOT WIDGET END -->
+
+    <!-- Input Area -->
+    <div class="p-3 bg-white border-t border-slate-200">
+        <div class="flex gap-2">
+            <input id="chat-input" type="text" placeholder="Type a message..." class="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-indigo-500 text-sm" onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()" id="send-btn" class="bg-indigo-600 text-white px-3 py-2 rounded-md hover:bg-indigo-700 transition">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+</div>
+<!-- CHATBOT WIDGET END -->
 
     <script>
         // 1. Mobile Menu Toggle
@@ -390,15 +387,86 @@
         });
 
         // 2. Chatbot Toggle Logic
-        function toggleChat() {
-            const chatWindow = document.getElementById('chat-window');
-            if (chatWindow.style.display === 'flex') {
-                chatWindow.style.display = 'none';
-            } else {
-                chatWindow.style.display = 'flex';
-                chatWindow.classList.add('chat-visible');
-            }
-        }
+function toggleChat() {
+    const chatWindow = document.getElementById('chat-window');
+    if (chatWindow.style.display === 'flex') {
+        chatWindow.style.display = 'none';
+    } else {
+        chatWindow.style.display = 'flex';
+        chatWindow.classList.add('chat-visible');
+    }
+}
+
+// 3. Send Message to Backend
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message to chat
+    addMessageToChat(message, 'user');
+    input.value = '';
+    
+    // Show loading indicator
+    const loadingId = addMessageToChat('Typing...', 'bot', true);
+    
+    try {
+        const response = await fetch('http://localhost:5000/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ message: message })
+        });
+        
+        const data = await response.json();
+        
+        // Remove loading indicator
+        removeMessage(loadingId);
+        
+        // Add bot response
+        addMessageToChat(data.reply, 'bot');
+        
+    } catch (error) {
+        removeMessage(loadingId);
+        addMessageToChat('Sorry, I had trouble connecting. Please try again.', 'bot');
+        console.error('Error:', error);
+    }
+}
+
+// 4. Add message to chat UI
+function addMessageToChat(message, sender, isLoading = false) {
+    const messagesDiv = document.getElementById('chat-messages');
+    const messageId = 'msg-' + Date.now();
+    
+    const messageHTML = `
+        <div id="${messageId}" class="flex ${sender === 'user' ? 'justify-end' : 'justify-start'}">
+            <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700'} rounded-lg ${sender === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'} px-4 py-2 text-sm shadow-sm max-w-[80%] ${isLoading ? 'animate-pulse' : ''}">
+                ${message}
+            </div>
+        </div>
+    `;
+    
+    messagesDiv.insertAdjacentHTML('beforeend', messageHTML);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    
+    return messageId;
+}
+
+// 5. Remove message (for loading indicator)
+function removeMessage(messageId) {
+    const msg = document.getElementById(messageId);
+    if (msg) msg.remove();
+}
+
+// 6. Handle Enter key press
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
 
         // 3. Canvas Animation: "Posture Simulation"
         // This visualizes the innovation without needing the actual webcam code yet
