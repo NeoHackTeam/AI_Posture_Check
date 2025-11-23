@@ -386,7 +386,7 @@
             menu.classList.toggle('hidden');
         });
 
-        // 2. Chatbot Toggle Logic
+      // 2. Chatbot Toggle Logic
 function toggleChat() {
     const chatWindow = document.getElementById('chat-window');
     if (chatWindow.style.display === 'flex') {
@@ -439,12 +439,22 @@ async function sendMessage() {
 // 4. Add message to chat UI
 function addMessageToChat(message, sender, isLoading = false) {
     const messagesDiv = document.getElementById('chat-messages');
-    const messageId = 'msg-' + Date.now();
+    const messageId = 'msg-' + Date.now() + '-' + Math.random(); // More unique ID
+    
+    // Format message: convert bullet points to proper line breaks
+    let formattedMessage = message;
+    if (sender === 'bot' && !isLoading) {
+        // Replace "- " at the start of lines or after periods with bullet points and line breaks
+        formattedMessage = message
+            .replace(/\. - /g, '.<br>• ')  // Handle ". - " pattern
+            .replace(/^- /gm, '• ')         // Handle lines starting with "- "
+            .replace(/\n/g, '<br>');        // Convert any newlines to <br>
+    }
     
     const messageHTML = `
         <div id="${messageId}" class="flex ${sender === 'user' ? 'justify-end' : 'justify-start'}">
             <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700'} rounded-lg ${sender === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'} px-4 py-2 text-sm shadow-sm max-w-[80%] ${isLoading ? 'animate-pulse' : ''}">
-                ${message}
+                ${formattedMessage}
             </div>
         </div>
     `;
@@ -458,7 +468,9 @@ function addMessageToChat(message, sender, isLoading = false) {
 // 5. Remove message (for loading indicator)
 function removeMessage(messageId) {
     const msg = document.getElementById(messageId);
-    if (msg) msg.remove();
+    if (msg) {
+        msg.remove();
+    }
 }
 
 // 6. Handle Enter key press
