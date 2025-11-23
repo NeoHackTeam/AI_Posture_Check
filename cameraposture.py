@@ -1,3 +1,33 @@
+def play_sound():
+    """Cross-platform sound alert"""
+    try:
+        if os.name == 'nt':  # Windows
+            winsound.Beep(1000, 500)
+        else:  # Mac/Linux
+            os.system('afplay /System/Library/Sounds/Glass.aiff')
+    except:
+        pass
+
+def play_loud_alert():
+    """Play loud alert sound for bad posture notification"""
+    def alert_thread():
+        try:
+            if os.name == 'nt':  # Windows
+                # Play loud beep pattern
+                for _ in range(3):
+                    winsound.Beep(1500, 300)
+                    time.sleep(0.1)
+                    winsound.Beep(1200, 300)
+                    time.sleep(0.1)
+            else:  # Mac/Linux
+                os.system('afplay /System/Library/Sounds/Alarm.aiff')
+        except:
+            pass
+    
+    # Run in separate thread to not block video
+    thread = threading.Thread(target=alert_thread, daemon=True)
+    thread.start()
+
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -10,6 +40,7 @@ import os
 from collections import deque
 import winsound  # For Windows; use os.system('afplay /System/Library/Sounds/Glass.aiff') on Mac
 from win10toast import ToastNotifier  # Windows notifications
+import threading
 
 # -------------------------------
 # CONFIG & SETTINGS
@@ -30,8 +61,8 @@ COLORS = {
 }
 
 DEFAULT_SETTINGS = {
-    "work_interval": 30,              # 30 seconds for demo
-    "break_duration": 5,              # 5 seconds for demo
+    "work_interval": 30,              # 30 seconds
+    "break_duration": 5,              # 5 seconds
     "neck_angle_threshold": 155,
     "shoulder_slouch_threshold": 145,
     "back_angle_threshold": 145,
@@ -418,6 +449,8 @@ def draw_modern_panel(frame, x, y, width, height, color=COLORS["light_blue"], al
 
 def put_text(frame, text, org, font_scale=0.6, color=COLORS["dark_gray"], thickness=2):
     """Put text with antialiasing"""
+    # Filter out problematic characters
+    text = text.encode('utf-8', errors='ignore').decode('utf-8')
     cv2.putText(frame, text, org, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness, cv2.LINE_AA)
 
 def draw_timer_widget(frame, timer, w, h):
@@ -662,10 +695,10 @@ def draw_help_overlay(frame):
     help_h = 130
     
     draw_modern_panel(frame, help_x, help_y, help_w, help_h,
-                     color=COLORS["light_gray"], alpha=0.2, border_width=1)
+                     color=COLORS["light_gray"], alpha=0.3, border_width=2)
     
     put_text(frame, "KEYBOARD CONTROLS", (help_x + 20, help_y + 20),
-            font_scale=0.5, color=COLORS["dark_gray"], thickness=1)
+            font_scale=0.5, color=(30, 30, 30), thickness=2)
     
     controls = [
         "C - Calibrate  S - Skip",
@@ -676,7 +709,7 @@ def draw_help_overlay(frame):
     y_pos = help_y + 45
     for control in controls:
         put_text(frame, control, (help_x + 15, y_pos),
-                font_scale=0.45, color=COLORS["dark_gray"], thickness=1)
+                font_scale=0.45, color=(30, 30, 30), thickness=2)
         y_pos += 25
 
 # =============================
@@ -725,7 +758,9 @@ def main():
     
     calibration_mode = True
     timestamp = 0
-
+    fps_clock = time.time()
+    fps_counter = 0
+    current_fps = 0
     show_help = True
     
     with PoseLandmarker.create_from_options(options) as landmarker:
@@ -739,7 +774,12 @@ def main():
             frame = cv2.flip(frame, 1)
             h, w, _ = frame.shape
             
-   
+            # FPS calculation
+            fps_counter += 1
+            if time.time() - fps_clock > 1:
+                current_fps = fps_counter
+                fps_counter = 0
+                fps_clock = time.time()
             
             # Process frame
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -819,6 +859,7 @@ def main():
                                                f"Bad posture detected: {issue_name}",
                                                duration=5,
                                                threaded=True)
+                                play_loud_alert()
                                 print(f"Notification sent: {issue_name} detected for 10+ seconds")
                             except Exception as e:
                                 print(f"Notification error: {e}")
@@ -847,6 +888,9 @@ def main():
             if not calibration_mode:
                 draw_timer_widget(frame, timer, w, h)
             
+            # Draw FPS
+            put_text(frame, f"FPS: {current_fps}", (w - 120, 30),
+                    font_scale=0.6, color=COLORS["primary_blue"], thickness=2)
             
             # Draw help overlay
             if show_help:
