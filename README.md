@@ -1,4 +1,4 @@
-# 🧍‍♂️ PosturePal  
+#  PosturePal  
 ### **AI-Powered Posture Detection, Break Timer & Productivity Assistant**
 
 PosturePal is an intelligent posture-monitoring system combining **computer vision**, **pose detection**, **AI chat**, and **productivity tools** to help users maintain healthy posture while working.
@@ -12,7 +12,7 @@ Both systems are included in this repository.
 
 ---
 
-# 📂 Project Structure
+#  Project Structure
 
 ```
 PosturePal/
@@ -31,7 +31,7 @@ PosturePal/
 
 ---
 
-# 🌐 1. Web PosturePal (Flask + HTML)
+#  1. Web PosturePal (Flask + HTML)
 
 The web interface allows users to:
 
@@ -60,7 +60,7 @@ Both servers **must** run at the same time for full functionality.
 
 ---
 
-# ▶️ How to Run the Web Version
+#  How to Run the Web Version
 
 ### Terminal 1 — Start main UI server
 ```bash
@@ -81,7 +81,7 @@ Then click **Start Web Demo** in the UI.
 
 ---
 
-# 🧠 2. Standalone PosturePal Desktop App
+#  2. Standalone PosturePal Desktop App
 
 The desktop application performs full real-time posture detection with OpenCV + MediaPipe and includes a Pomodoro-style work/break timer.
 
@@ -92,7 +92,7 @@ python cameraposture.py
 
 ---
 
-# 📸 Real-Time Pose Detection
+#  Real-Time Pose Detection
 
 PosturePal uses MediaPipe PoseLandmarker to detect:
 
@@ -106,7 +106,7 @@ Runs at **25–30 FPS**.
 
 ---
 
-# 📐 Angle Calculations
+#  Angle Calculations
 
 Three major posture angles are computed:
 
@@ -124,7 +124,7 @@ Angles are smoothed using an **8-frame median filter**.
 
 ---
 
-# 🔔 Smart Notifications
+#  Smart Notifications
 
 Notifications trigger when:
 
@@ -137,7 +137,7 @@ PosturePal waits for posture to improve before re-triggering alerts.
 
 ---
 
-# ⏱️ Work/Break Timer
+#  Work/Break Timer
 
 Features:
 
@@ -149,7 +149,7 @@ Features:
 
 ---
 
-# 🎯 Calibration
+#  Calibration
 
 Press `C` to calibrate:
 
@@ -163,7 +163,7 @@ Press `S` to skip.
 
 ---
 
-# 🖥️ UI Features
+#  UI Features
 
 - Skeleton overlay (green = good, red = bad)  
 - Neck/shoulder/back angle readouts  
@@ -175,7 +175,7 @@ Press `S` to skip.
 
 ---
 
-# ⌨️ Keyboard Shortcuts
+#  Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -187,7 +187,7 @@ Press `S` to skip.
 
 ---
 
-# ⚙️ posture_settings.json Example
+#  posture_settings.json Example
 
 ```json
 {
@@ -208,7 +208,7 @@ Press `S` to skip.
 
 ---
 
-# 🔧 Troubleshooting
+#  Troubleshooting
 
 ### Camera Not Opening
 - Run both Flask servers in **separate terminals**  
@@ -233,7 +233,7 @@ is in the project directory.
 
 ---
 
-# 🧱 System Architecture Overview
+#  System Architecture Overview
 
 ```
  ┌────────────────────────────────────────────┐
@@ -256,7 +256,7 @@ is in the project directory.
 
 ---
 
-# 🚀 Future Improvements
+#  Future Improvements
 
 - Web-based pose detection (WebAssembly)  
 - Animated stretch routines  
@@ -267,7 +267,7 @@ is in the project directory.
 
 ---
 
-# 🔐 Privacy
+#  Privacy
 
 - 100% local  
 - No cloud storage  
@@ -276,7 +276,7 @@ is in the project directory.
 
 ---
 
-# 📄 License & Attribution
+#  License & Attribution
 
 Uses:
 
