@@ -466,16 +466,99 @@
             menu.classList.toggle('hidden');
         });
 
-        // Chatbot Toggle
-        function toggleChat() {
-            const chatWindow = document.getElementById('chat-window');
-            if (chatWindow.style.display === 'flex') {
-                chatWindow.style.display = 'none';
-            } else {
-                chatWindow.style.display = 'flex';
-                chatWindow.classList.add('chat-visible');
-            }
-        }
+         // 2. Chatbot Toggle Logic
+function toggleChat() {
+    const chatWindow = document.getElementById('chat-window');
+    if (chatWindow.style.display === 'flex') {
+        chatWindow.style.display = 'none';
+    } else {
+        chatWindow.style.display = 'flex';
+        chatWindow.classList.add('chat-visible');
+    }
+}
+
+// 3. Send Message to Backend
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message to chat
+    addMessageToChat(message, 'user');
+    input.value = '';
+    
+    // Show loading indicator
+    const loadingId = addMessageToChat('Typing...', 'bot', true);
+    
+    try {
+        const response = await fetch('http://localhost:5000/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ message: message })
+        });
+        
+        const data = await response.json();
+        
+        // Remove loading indicator
+        removeMessage(loadingId);
+        
+        // Add bot response
+        addMessageToChat(data.reply, 'bot');
+        
+    } catch (error) {
+        removeMessage(loadingId);
+        addMessageToChat('Sorry, I had trouble connecting. Please try again.', 'bot');
+        console.error('Error:', error);
+    }
+}
+
+// 4. Add message to chat UI
+function addMessageToChat(message, sender, isLoading = false) {
+    const messagesDiv = document.getElementById('chat-messages');
+    const messageId = 'msg-' + Date.now() + '-' + Math.random(); // More unique ID
+    
+    // Format message: convert bullet points to proper line breaks
+    let formattedMessage = message;
+    if (sender === 'bot' && !isLoading) {
+        // Replace "- " at the start of lines or after periods with bullet points and line breaks
+        formattedMessage = message
+            .replace(/\. - /g, '.<br>• ')  // Handle ". - " pattern
+            .replace(/^- /gm, '• ')         // Handle lines starting with "- "
+            .replace(/\n/g, '<br>');        // Convert any newlines to <br>
+    }
+    
+    const messageHTML = `
+        <div id="${messageId}" class="flex ${sender === 'user' ? 'justify-end' : 'justify-start'}">
+            <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700'} rounded-lg ${sender === 'user' ? 'rounded-tr-none' : 'rounded-tl-none'} px-4 py-2 text-sm shadow-sm max-w-[80%] ${isLoading ? 'animate-pulse' : ''}">
+                ${formattedMessage}
+            </div>
+        </div>
+    `;
+    
+    messagesDiv.insertAdjacentHTML('beforeend', messageHTML);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    
+    return messageId;
+}
+
+// 5. Remove message (for loading indicator)
+function removeMessage(messageId) {
+    const msg = document.getElementById(messageId);
+    if (msg) {
+        msg.remove();
+    }
+}
+
+// 6. Handle Enter key press
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
 
         // Camera Modal Functions
         function openCameraModal() {
