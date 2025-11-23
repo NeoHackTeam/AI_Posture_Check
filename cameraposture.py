@@ -725,9 +725,7 @@ def main():
     
     calibration_mode = True
     timestamp = 0
-    fps_clock = time.time()
-    fps_counter = 0
-    current_fps = 0
+
     show_help = True
     
     with PoseLandmarker.create_from_options(options) as landmarker:
@@ -741,12 +739,7 @@ def main():
             frame = cv2.flip(frame, 1)
             h, w, _ = frame.shape
             
-            # FPS calculation
-            fps_counter += 1
-            if time.time() - fps_clock > 1:
-                current_fps = fps_counter
-                fps_counter = 0
-                fps_clock = time.time()
+   
             
             # Process frame
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -854,9 +847,6 @@ def main():
             if not calibration_mode:
                 draw_timer_widget(frame, timer, w, h)
             
-            # Draw FPS
-            put_text(frame, f"FPS: {current_fps}", (w - 120, 30),
-                    font_scale=0.6, color=COLORS["primary_blue"], thickness=2)
             
             # Draw help overlay
             if show_help:
