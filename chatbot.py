@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify, render_template, session
+from flask_cors import CORS
 from openai import OpenAI
 import os
 
 app = Flask(__name__)
 app.secret_key = "abc123"  # Needed for Flask session
+CORS(app, supports_credentials=True)
 
 # Initialize OpenAI client
 client = OpenAI(api_key="APIKEYHERE")
@@ -53,4 +55,5 @@ def clear():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
