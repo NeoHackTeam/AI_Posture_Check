@@ -111,6 +111,7 @@
                 </div>
                 <div class="hidden md:flex space-x-8">
                     <a href="#features" class="text-slate-600 hover:text-indigo-600 transition">Features</a>
+                    <a href="#leaderboard" class="text-slate-600 hover:text-indigo-600 transition">Leaderboard</a>
                     <a href="#demo" class="text-slate-600 hover:text-indigo-600 transition">How it Works</a>
                     <a href="#about" class="text-slate-600 hover:text-indigo-600 transition">About Us</a>
                 </div>
@@ -131,6 +132,7 @@
         </div>
         <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-slate-200">
             <a href="#features" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">Features</a>
+            <a href="#leaderboard" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">Leaderboard</a>
             <a href="#demo" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">How it Works</a>
             <a href="#about" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">About Us</a>
             <button onclick="openCameraModal()" class="block w-full text-left px-4 py-2 text-emerald-600 font-bold hover:bg-slate-50">Launch Camera</button>
@@ -178,7 +180,7 @@
                         </div>
                         <div class="absolute top-4 right-4 z-10 text-right font-mono text-xs">
                             <div class="text-emerald-400 mb-1">Status: <span id="sim-status">Scanning...</span></div>
-                            <div class="text-slate-400">Neck Angle: <span id="sim-angle" class="text-white">0°</span></div>
+                            <div class="text-slate-400">Neck Angle: <span id="sim-angle" class="text-white">0Â°</span></div>
                             <div class="text-slate-400">Shoulder Lvl: <span id="sim-shoulder" class="text-white">Balanced</span></div>
                         </div>
                         
@@ -211,7 +213,7 @@
                         <i class="fa-solid fa-ruler-combined text-xl"></i>
                     </div>
                     <h3 class="text-xl font-bold text-slate-900 mb-2">Neck Angle Analysis</h3>
-                    <p class="text-slate-600 text-sm">Real-time calculation of your cervical spine angle. Alerts trigger when you exceed your safe threshold (e.g., >15°).</p>
+                    <p class="text-slate-600 text-sm">Real-time calculation of your cervical spine angle. Alerts trigger when you exceed your safe threshold (e.g., >15Â°).</p>
                 </div>
 
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
@@ -253,6 +255,106 @@
                     <h3 class="text-xl font-bold text-slate-900 mb-2">Progress Tracking</h3>
                     <p class="text-slate-600 text-sm">Visualize your posture improvements over time with detailed session analytics.</p>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- NEW LEADERBOARD SECTION -->
+    <section id="leaderboard" class="py-20 bg-slate-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-10">
+                <span class="inline-block px-3 py-1 mb-3 text-xs font-semibold tracking-wider text-amber-600 uppercase bg-amber-100 rounded-full">
+                    <i class="fa-solid fa-trophy mr-1"></i> Community Challenge
+                </span>
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">Top Posture Pals</h2>
+                <p class="text-slate-600">
+                    Compete with friends! Earn 
+                    <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold text-xs border border-indigo-200">1 Point</span>
+                    for every 
+                    <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold text-xs border border-emerald-200">4 Minutes</span> 
+                    of good posture.
+                </p>
+            </div>
+
+            <!-- Leaderboard Card -->
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+                <!-- Header Row -->
+                <div class="grid grid-cols-12 gap-2 md:gap-4 p-4 bg-slate-900 text-white text-xs md:text-sm font-semibold uppercase tracking-wider">
+                    <div class="col-span-2 text-center">Rank</div>
+                    <div class="col-span-5 md:col-span-6">User</div>
+                    <div class="col-span-3 md:col-span-2 text-right">Streak</div>
+                    <div class="col-span-2 text-center">Pts</div>
+                </div>
+
+                <!-- Row 1 (Gold) -->
+                <div class="grid grid-cols-12 gap-2 md:gap-4 p-4 border-b border-slate-100 items-center hover:bg-slate-50 transition">
+                    <div class="col-span-2 text-center">
+                        <div class="w-8 h-8 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto font-bold shadow-sm ring-2 ring-yellow-200">1</div>
+                    </div>
+                    <div class="col-span-5 md:col-span-6 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm hidden sm:flex">SJ</div>
+                        <div>
+                            <div class="font-bold text-slate-900 text-sm md:text-base">Sarah Jenkins</div>
+                            <div class="text-xs text-slate-500">Med School</div>
+                        </div>
+                    </div>
+                    <div class="col-span-3 md:col-span-2 text-right font-mono text-slate-600 text-sm">4h 12m</div>
+                    <div class="col-span-2 text-center font-bold text-indigo-600 text-base md:text-lg">63</div>
+                </div>
+
+                <!-- Row 2 (Silver) -->
+                <div class="grid grid-cols-12 gap-2 md:gap-4 p-4 border-b border-slate-100 items-center hover:bg-slate-50 transition">
+                    <div class="col-span-2 text-center">
+                        <div class="w-8 h-8 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center mx-auto font-bold shadow-sm ring-2 ring-slate-300">2</div>
+                    </div>
+                    <div class="col-span-5 md:col-span-6 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-slate-400 to-slate-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm hidden sm:flex">MT</div>
+                        <div>
+                            <div class="font-bold text-slate-900 text-sm md:text-base">Mike Thompson</div>
+                            <div class="text-xs text-slate-500">Comp Sci</div>
+                        </div>
+                    </div>
+                    <div class="col-span-3 md:col-span-2 text-right font-mono text-slate-600 text-sm">3h 48m</div>
+                    <div class="col-span-2 text-center font-bold text-indigo-600 text-base md:text-lg">57</div>
+                </div>
+
+                <!-- Row 3 (Bronze) -->
+                <div class="grid grid-cols-12 gap-2 md:gap-4 p-4 border-b border-slate-100 items-center hover:bg-slate-50 transition">
+                    <div class="col-span-2 text-center">
+                        <div class="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto font-bold shadow-sm ring-2 ring-orange-200">3</div>
+                    </div>
+                    <div class="col-span-5 md:col-span-6 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm hidden sm:flex">JR</div>
+                        <div>
+                            <div class="font-bold text-slate-900 text-sm md:text-base">Jessica Ross</div>
+                            <div class="text-xs text-slate-500">Law</div>
+                        </div>
+                    </div>
+                    <div class="col-span-3 md:col-span-2 text-right font-mono text-slate-600 text-sm">3h 20m</div>
+                    <div class="col-span-2 text-center font-bold text-indigo-600 text-base md:text-lg">50</div>
+                </div>
+
+                <!-- User Row (Highlight) -->
+                <div class="grid grid-cols-12 gap-2 md:gap-4 p-4 bg-indigo-50 items-center border-l-4 border-indigo-500">
+                    <div class="col-span-2 text-center font-bold text-indigo-900 text-sm">452</div>
+                    <div class="col-span-5 md:col-span-6 flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md hidden sm:flex">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-indigo-900 text-sm md:text-base">You</div>
+                            <div class="text-xs text-indigo-600 font-medium">Session Active...</div>
+                        </div>
+                    </div>
+                    <div class="col-span-3 md:col-span-2 text-right font-mono text-indigo-900 text-sm">0h 00m</div>
+                    <div class="col-span-2 text-center font-bold text-indigo-600 text-base md:text-lg">0</div>
+                </div>
+            </div>
+            
+            <div class="mt-6 text-center">
+                 <button onclick="openCameraModal()" class="inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition">
+                    Start a session to rank up <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
             </div>
         </div>
     </section>
@@ -399,6 +501,7 @@
         </button>
     </div>
 </div>
+</div> <!-- Added missing closing div -->
 
     <!-- Camera Launch Modal -->
     <div id="cameraModal" class="modal">
@@ -487,6 +590,9 @@ async function sendMessage() {
     const loadingId = addMessageToChat('Typing...', 'bot', true);
     
     try {
+        console.log('Sending to:', 'http://localhost:5000/chat');
+        console.log('Message:', message);
+        
         const response = await fetch('http://localhost:5000/chat', {
             method: 'POST',
             headers: {
@@ -496,18 +602,29 @@ async function sendMessage() {
             body: JSON.stringify({ message: message })
         });
         
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('Response data:', data);
         
         // Remove loading indicator
         removeMessage(loadingId);
         
-        // Add bot response
-        addMessageToChat(data.reply, 'bot');
+        // Check if there's an error in the response
+        if (data.error) {
+            addMessageToChat(`Error: ${data.error}`, 'bot');
+        } else {
+            addMessageToChat(data.reply, 'bot');
+        }
         
     } catch (error) {
+        console.error('Full error:', error);
         removeMessage(loadingId);
-        addMessageToChat('Sorry, I had trouble connecting. Please try again.', 'bot');
-        console.error('Error:', error);
+        addMessageToChat(`Connection error: ${error.message}. Make sure the server is running on port 5000.`, 'bot');
     }
 }
 
@@ -521,8 +638,8 @@ function addMessageToChat(message, sender, isLoading = false) {
     if (sender === 'bot' && !isLoading) {
         // Replace "- " at the start of lines or after periods with bullet points and line breaks
         formattedMessage = message
-            .replace(/\. - /g, '.<br>• ')  // Handle ". - " pattern
-            .replace(/^- /gm, '• ')         // Handle lines starting with "- "
+            .replace(/\. - /g, '.<br>â€¢ ')  // Handle ". - " pattern
+            .replace(/^- /gm, 'â€¢ ')         // Handle lines starting with "- "
             .replace(/\n/g, '<br>');        // Convert any newlines to <br>
     }
     
@@ -567,7 +684,7 @@ function handleKeyPress(event) {
         function startWebDemo() {
             closeCameraModal();
             // Open the Flask server camera demo
-            window.open('http://localhost:8000', '_blank', 'width=1400,height=900');
+            window.open('http://localhost:5000/camera', '_blank', 'width=1400,height=900');
         }
 
         // Close modal when clicking outside
@@ -656,7 +773,7 @@ function handleKeyPress(event) {
 
             // Update UI
             const angle = Math.round(postureFactor * 45);
-            angleEl.innerText = angle + "°";
+            angleEl.innerText = angle + "Â°";
             angleEl.style.color = isBad ? '#ef4444' : '#fff';
             
             statusEl.innerText = isBad ? "Slouching Detected" : "Good Posture";
