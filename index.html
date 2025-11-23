@@ -25,7 +25,6 @@
             from { transform: translate(0, 0) scale(1); }
             to { transform: translate(20px, -20px) scale(1.1); }
         }
-        /* Chatbot specific styles */
         .chat-bubble {
             position: fixed;
             bottom: 20px;
@@ -43,7 +42,7 @@
             border-radius: 1rem;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             z-index: 49;
-            display: none; /* Hidden by default */
+            display: none;
             flex-direction: column;
             overflow: hidden;
             border: 1px solid #e5e7eb;
@@ -55,6 +54,46 @@
         @keyframes slideUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .close-modal:hover {
+            color: #000;
         }
     </style>
 </head>
@@ -73,12 +112,14 @@
                     <a href="#demo" class="text-slate-600 hover:text-indigo-600 transition">How it Works</a>
                     <a href="#about" class="text-slate-600 hover:text-indigo-600 transition">About Us</a>
                 </div>
-                <div class="hidden md:flex">
+                <div class="hidden md:flex gap-3">
+                    <button onclick="openCameraModal()" class="bg-emerald-600 text-white px-5 py-2 rounded-full font-medium hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/30">
+                        <i class="fa-solid fa-video mr-2"></i>Launch Camera
+                    </button>
                     <a href="#download" class="bg-indigo-600 text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">
                         Get the App
                     </a>
                 </div>
-                <!-- Mobile menu button -->
                 <div class="md:hidden flex items-center">
                     <button id="mobile-menu-btn" class="text-slate-600 focus:outline-none">
                         <i class="fa-solid fa-bars text-2xl"></i>
@@ -86,11 +127,11 @@
                 </div>
             </div>
         </div>
-        <!-- Mobile Menu -->
         <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-slate-200">
             <a href="#features" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">Features</a>
             <a href="#demo" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">How it Works</a>
             <a href="#about" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">About Us</a>
+            <button onclick="openCameraModal()" class="block w-full text-left px-4 py-2 text-emerald-600 font-bold hover:bg-slate-50">Launch Camera</button>
             <a href="#download" class="block px-4 py-2 text-indigo-600 font-bold hover:bg-slate-50">Download</a>
         </div>
     </nav>
@@ -102,7 +143,6 @@
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="grid lg:grid-cols-2 gap-12 items-center">
-                <!-- Text Content -->
                 <div class="text-center lg:text-left">
                     <div class="inline-block px-3 py-1 mb-4 text-xs font-semibold tracking-wider text-indigo-600 uppercase bg-indigo-100 rounded-full">
                         AI-Powered Health Tech
@@ -115,6 +155,9 @@
                         Posture Pal uses advanced computer vision to scan your posture in real-time. Protect your spine, reduce fatigue, and boost focus with intelligent alerts.
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                        <button onclick="openCameraModal()" class="px-8 py-3.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                            <i class="fa-solid fa-video mr-2"></i> Try Camera Now
+                        </button>
                         <a href="#download" class="px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30 flex items-center justify-center">
                             <i class="fa-brands fa-windows mr-2"></i> Download Beta
                         </a>
@@ -124,7 +167,6 @@
                     </div>
                 </div>
 
-                <!-- Interactive Canvas Simulation (Innovation Showcase) -->
                 <div class="relative mx-auto w-full max-w-md lg:max-w-full">
                     <div class="bg-slate-900 rounded-2xl shadow-2xl p-4 relative overflow-hidden border border-slate-700">
                         <div class="absolute top-4 left-4 z-10">
@@ -132,14 +174,12 @@
                                 <span class="w-2 h-2 rounded-full bg-red-500"></span> RECORDING
                             </span>
                         </div>
-                        <!-- Data Overlay -->
                         <div class="absolute top-4 right-4 z-10 text-right font-mono text-xs">
                             <div class="text-emerald-400 mb-1">Status: <span id="sim-status">Scanning...</span></div>
                             <div class="text-slate-400">Neck Angle: <span id="sim-angle" class="text-white">0°</span></div>
                             <div class="text-slate-400">Shoulder Lvl: <span id="sim-shoulder" class="text-white">Balanced</span></div>
                         </div>
                         
-                        <!-- The Canvas -->
                         <canvas id="postureCanvas" width="400" height="300" class="w-full h-auto bg-slate-800 rounded-lg"></canvas>
                         
                         <div class="mt-4 p-3 bg-slate-800 rounded border border-slate-700">
@@ -149,7 +189,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Decorative Elements -->
                     <div class="absolute -z-10 top-10 -right-10 w-24 h-24 bg-indigo-600 rounded-full blur-2xl opacity-20"></div>
                 </div>
             </div>
@@ -165,7 +204,6 @@
             </div>
 
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Feature 1 -->
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
                     <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 mb-4 group-hover:bg-indigo-600 group-hover:text-white transition">
                         <i class="fa-solid fa-ruler-combined text-xl"></i>
@@ -174,7 +212,6 @@
                     <p class="text-slate-600 text-sm">Real-time calculation of your cervical spine angle. Alerts trigger when you exceed your safe threshold (e.g., >15°).</p>
                 </div>
 
-                <!-- Feature 2 -->
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
                     <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 mb-4 group-hover:bg-emerald-600 group-hover:text-white transition">
                         <i class="fa-solid fa-scale-balanced text-xl"></i>
@@ -183,7 +220,6 @@
                     <p class="text-slate-600 text-sm">Detects slouching by monitoring shoulder level variance. Keeps your upper back aligned and engaged.</p>
                 </div>
 
-                <!-- Feature 3 -->
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
                     <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 mb-4 group-hover:bg-orange-600 group-hover:text-white transition">
                         <i class="fa-solid fa-eye text-xl"></i>
@@ -192,7 +228,6 @@
                     <p class="text-slate-600 text-sm">Ensures you maintain a healthy screen distance to reduce eye strain and forward head posture.</p>
                 </div>
 
-                <!-- Feature 4 -->
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
                     <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-pink-600 mb-4 group-hover:bg-pink-600 group-hover:text-white transition">
                         <i class="fa-solid fa-mug-hot text-xl"></i>
@@ -201,7 +236,6 @@
                     <p class="text-slate-600 text-sm">Customizable Pomodoro-style timers integrated with posture fatigue detection.</p>
                 </div>
 
-                <!-- Feature 5 -->
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
                     <div class="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center text-cyan-600 mb-4 group-hover:bg-cyan-600 group-hover:text-white transition">
                         <i class="fa-solid fa-stopwatch text-xl"></i>
@@ -210,7 +244,6 @@
                     <p class="text-slate-600 text-sm">Intelligent buffer zones prevent false alarms when you just need to reach for your coffee.</p>
                 </div>
 
-                <!-- Feature 6 -->
                 <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
                     <div class="w-12 h-12 bg-violet-100 rounded-lg flex items-center justify-center text-violet-600 mb-4 group-hover:bg-violet-600 group-hover:text-white transition">
                         <i class="fa-solid fa-chart-line text-xl"></i>
@@ -222,7 +255,7 @@
         </div>
     </section>
 
-    <!-- How It Works / Demo Impact -->
+    <!-- How It Works -->
     <section id="demo" class="py-20 bg-slate-900 text-white relative overflow-hidden">
         <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -254,7 +287,6 @@
                     </div>
                 </div>
                 <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-2xl">
-                    <!-- Mock Interface Code Snippet -->
                     <div class="flex items-center gap-2 mb-4">
                         <div class="w-3 h-3 rounded-full bg-red-500"></div>
                         <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -277,7 +309,7 @@
         </div>
     </section>
 
-    <!-- About Me Section -->
+    <!-- About Section -->
     <section id="about" class="py-20 bg-slate-50">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-bold text-slate-900 mb-8">Behind The Code</h2>
@@ -341,34 +373,26 @@
         </div>
     </footer>
 
-    <!-- CHATBOT WIDGET START -->
-    <!-- This is the container for your future Chatbot integration -->
-    
-    <!-- Floating Button -->
+    <!-- Chatbot Floating Button -->
     <button onclick="toggleChat()" class="chat-bubble bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110">
         <i class="fa-solid fa-message text-xl"></i>
     </button>
 
     <!-- Chat Window -->
     <div id="chat-window" class="chat-window">
-        <!-- Chat Header -->
         <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
             <div class="font-bold"><i class="fa-solid fa-robot mr-2"></i>PostureBot AI</div>
             <button onclick="toggleChat()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-times"></i></button>
         </div>
         
-        <!-- Chat Messages Area -->
         <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-3">
-            <!-- Initial Greeting -->
             <div class="flex justify-start">
                 <div class="bg-white border border-slate-200 text-slate-700 rounded-lg rounded-tl-none px-4 py-2 text-sm shadow-sm max-w-[80%]">
                     Hi! I'm your posture assistant. Ask me about ergonomic setups or how to configure the app!
                 </div>
             </div>
-            <!-- Dynamic messages will be injected here via JS later -->
         </div>
 
-        <!-- Input Area -->
         <div class="p-3 bg-white border-t border-slate-200">
             <div class="flex gap-2">
                 <input type="text" placeholder="Type a message..." class="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-indigo-500 text-sm">
@@ -378,10 +402,61 @@
             </div>
         </div>
     </div>
-    <!-- CHATBOT WIDGET END -->
+
+    <!-- Camera Launch Modal -->
+    <div id="cameraModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeCameraModal()">&times;</span>
+            <h2 class="text-3xl font-bold text-slate-900 mb-4">
+                <i class="fa-solid fa-video text-indigo-600 mr-2"></i>Launch Camera Detection
+            </h2>
+            
+            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6">
+                <p class="text-indigo-800 text-sm">
+                    <i class="fa-solid fa-info-circle mr-2"></i>
+                    <strong>Web Browser Limitation:</strong> The full Python-based posture detection with MediaPipe requires the desktop application.
+                </p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-5">
+                    <h3 class="text-lg font-bold text-slate-900 mb-2 flex items-center">
+                        <span class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mr-3 font-bold">2</span>
+                        Try Basic Web Demo
+                    </h3>
+                    <p class="text-slate-600 text-sm ml-11 mb-3">
+                        Test a simplified browser-based version using your webcam (limited features).
+                    </p>
+                    <button onclick="startWebDemo()" class="mt-3 ml-11 px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
+                        <i class="fa-solid fa-play mr-2"></i>Start Web Demo
+                    </button>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-5">
+                    <h3 class="text-lg font-bold text-slate-900 mb-2 flex items-center">
+                        <span class="w-8 h-8 bg-cyan-100 text-cyan-600 rounded-full flex items-center justify-center mr-3 font-bold">3</span>
+                        Run Python Script Locally
+                    </h3>
+                    <p class="text-slate-600 text-sm ml-11">
+                        Advanced users can run the Python script directly with full MediaPipe integration.
+                    </p>
+                    <div class="mt-3 ml-11 bg-slate-800 rounded p-3 text-xs text-green-400 font-mono">
+                        $ python posture_detector.py
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-slate-200 text-center">
+                <p class="text-sm text-slate-500">
+                    <i class="fa-solid fa-shield-halved text-indigo-600 mr-1"></i>
+                    Your privacy matters: All camera processing happens locally on your device.
+                </p>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // 1. Mobile Menu Toggle
+        // Mobile Menu Toggle
         const btn = document.getElementById('mobile-menu-btn');
         const menu = document.getElementById('mobile-menu');
 
@@ -389,7 +464,7 @@
             menu.classList.toggle('hidden');
         });
 
-        // 2. Chatbot Toggle Logic
+        // Chatbot Toggle
         function toggleChat() {
             const chatWindow = document.getElementById('chat-window');
             if (chatWindow.style.display === 'flex') {
@@ -400,8 +475,30 @@
             }
         }
 
-        // 3. Canvas Animation: "Posture Simulation"
-        // This visualizes the innovation without needing the actual webcam code yet
+        // Camera Modal Functions
+        function openCameraModal() {
+            document.getElementById('cameraModal').style.display = 'block';
+        }
+
+        function closeCameraModal() {
+            document.getElementById('cameraModal').style.display = 'none';
+        }
+
+        function startWebDemo() {
+            closeCameraModal();
+            // Open the Flask server camera demo
+            window.open('http://localhost:5000', '_blank', 'width=1400,height=900');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('cameraModal');
+            if (event.target === modal) {
+                closeCameraModal();
+            }
+        }
+
+        // Canvas Animation: Posture Simulation
         const canvas = document.getElementById('postureCanvas');
         const ctx = canvas.getContext('2d');
         const statusEl = document.getElementById('sim-status');
@@ -417,17 +514,23 @@
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            for(let i=0; i<canvas.width; i+=40) { ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); }
-            for(let i=0; i<canvas.height; i+=40) { ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); }
+            for(let i=0; i<canvas.width; i+=40) { 
+                ctx.moveTo(i,0); 
+                ctx.lineTo(i,canvas.height); 
+            }
+            for(let i=0; i<canvas.height; i+=40) { 
+                ctx.moveTo(0,i); 
+                ctx.lineTo(canvas.width,i); 
+            }
             ctx.stroke();
 
             // Colors based on posture
             const isBad = postureFactor > 0.6;
-            const color = isBad ? '#ef4444' : '#10b981'; // Red or Green
+            const color = isBad ? '#ef4444' : '#10b981';
             
-            // Skeleton points (Simple interpolation between good and bad state)
-            const headX = 200 + (postureFactor * 40); // Head moves forward
-            const headY = 100 + (postureFactor * 20); // Head drops
+            // Skeleton points
+            const headX = 200 + (postureFactor * 40);
+            const headY = 100 + (postureFactor * 20);
             const neckX = 200;
             const neckY = 150;
             const shoulderX = 200;
@@ -441,12 +544,12 @@
             // Draw Body
             ctx.beginPath();
             ctx.moveTo(neckX, neckY);
-            ctx.lineTo(neckX, 280); // Spine
-            ctx.moveTo(160, shoulderY); // Left Shoulder
-            ctx.lineTo(240, shoulderY); // Right Shoulder
+            ctx.lineTo(neckX, 280);
+            ctx.moveTo(160, shoulderY);
+            ctx.lineTo(240, shoulderY);
             ctx.stroke();
 
-            // Draw Neck connection
+            // Draw Neck
             ctx.beginPath();
             ctx.moveTo(neckX, neckY);
             ctx.lineTo(headX, headY);
@@ -457,21 +560,21 @@
             ctx.arc(headX, headY - 30, 30, 0, Math.PI * 2);
             ctx.stroke();
             
-            // Face Features (Eyes)
+            // Eyes
             ctx.beginPath();
             ctx.arc(headX + 10, headY - 35, 2, 0, Math.PI * 2);
             ctx.fill();
 
-            // Angle Line Visualization
+            // Angle Line
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
-            ctx.moveTo(neckX, neckY); // Vertical ref
+            ctx.moveTo(neckX, neckY);
             ctx.lineTo(neckX, headY - 50);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Update UI Stats
+            // Update UI
             const angle = Math.round(postureFactor * 45);
             angleEl.innerText = angle + "°";
             angleEl.style.color = isBad ? '#ef4444' : '#fff';
@@ -485,20 +588,30 @@
 
         function animate() {
             time += 0.02;
-            // Create a sine wave motion that lingers in "good" posture then dips to "bad"
             let posture = (Math.sin(time) + 1) / 2; 
             
-            // Make the movement snappier
-            if(posture < 0.3) posture = 0.1; // Stay good
-            else if(posture > 0.7) posture = 0.8; // Stay bad
+            if(posture < 0.3) posture = 0.1;
+            else if(posture > 0.7) posture = 0.8;
             
             drawSkeleton(posture);
             requestAnimationFrame(animate);
         }
 
-        // Start animation
         animate();
-
     </script>
 </body>
 </html>
+                        <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mr-3 font-bold">1</span>
+                        Download the Desktop App
+                    </h3>
+                    <p class="text-slate-600 text-sm ml-11">
+                        Download our Windows/Mac application for full camera access with advanced posture detection.
+                    </p>
+                    <button onclick="window.location.href='#download'" class="mt-3 ml-11 px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                        <i class="fa-solid fa-download mr-2"></i>Download Now
+                    </button>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-5">
+                    <h3 class="text-lg font-bold text-slate-900 mb-2 flex items-center">
+                
