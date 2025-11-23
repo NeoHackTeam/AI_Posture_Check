@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Posture Pal | AI-Powered Study Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-text {
+            background: linear-gradient(to right, #4f46e5, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .blob {
+            position: absolute;
+            filter: blur(50px);
+            z-index: -1;
+            opacity: 0.4;
+            animation: move 10s infinite alternate;
+        }
+        @keyframes move {
+            from { transform: translate(0, 0) scale(1); }
+            to { transform: translate(20px, -20px) scale(1.1); }
+        }
+        /* Chatbot specific styles */
+        .chat-bubble {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+        .chat-window {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            z-index: 49;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        .chat-visible {
+            display: flex;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 relative overflow-x-hidden">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fa-solid fa-person-praying text-indigo-600 text-2xl mr-2"></i>
+                    <span class="font-bold text-xl tracking-tight text-slate-900">Posture<span class="text-indigo-600">Pal</span></span>
+                </div>
+                <div class="hidden md:flex space-x-8">
+                    <a href="#features" class="text-slate-600 hover:text-indigo-600 transition">Features</a>
+                    <a href="#demo" class="text-slate-600 hover:text-indigo-600 transition">How it Works</a>
+                    <a href="#about" class="text-slate-600 hover:text-indigo-600 transition">About Us</a>
+                </div>
+                <div class="hidden md:flex">
+                    <a href="#download" class="bg-indigo-600 text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">
+                        Get the App
+                    </a>
+                </div>
+                <!-- Mobile menu button -->
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-btn" class="text-slate-600 focus:outline-none">
+                        <i class="fa-solid fa-bars text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-slate-200">
+            <a href="#features" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">Features</a>
+            <a href="#demo" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">How it Works</a>
+            <a href="#about" class="block px-4 py-2 text-slate-600 hover:bg-slate-50">About Us</a>
+            <a href="#download" class="block px-4 py-2 text-indigo-600 font-bold hover:bg-slate-50">Download</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        <div class="blob bg-indigo-300 w-96 h-96 rounded-full top-0 left-0 mix-blend-multiply"></div>
+        <div class="blob bg-cyan-300 w-96 h-96 rounded-full bottom-0 right-0 mix-blend-multiply"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Text Content -->
+                <div class="text-center lg:text-left">
+                    <div class="inline-block px-3 py-1 mb-4 text-xs font-semibold tracking-wider text-indigo-600 uppercase bg-indigo-100 rounded-full">
+                        AI-Powered Health Tech
+                    </div>
+                    <h1 class="text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 text-slate-900">
+                        Sit Straighter. <br>
+                        <span class="gradient-text">Study Better.</span>
+                    </h1>
+                    <p class="text-lg text-slate-600 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                        Posture Pal uses advanced computer vision to scan your posture in real-time. Protect your spine, reduce fatigue, and boost focus with intelligent alerts.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                        <a href="#download" class="px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+                            <i class="fa-brands fa-windows mr-2"></i> Download Beta
+                        </a>
+                        <button onclick="toggleChat()" class="px-8 py-3.5 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition flex items-center justify-center">
+                            <i class="fa-regular fa-comment-dots mr-2"></i> Ask AI Assistant
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Interactive Canvas Simulation (Innovation Showcase) -->
+                <div class="relative mx-auto w-full max-w-md lg:max-w-full">
+                    <div class="bg-slate-900 rounded-2xl shadow-2xl p-4 relative overflow-hidden border border-slate-700">
+                        <div class="absolute top-4 left-4 z-10">
+                            <span class="flex items-center gap-2 px-2 py-1 bg-red-500/20 border border-red-500/50 rounded text-red-400 text-xs font-mono animate-pulse">
+                                <span class="w-2 h-2 rounded-full bg-red-500"></span> RECORDING
+                            </span>
+                        </div>
+                        <!-- Data Overlay -->
+                        <div class="absolute top-4 right-4 z-10 text-right font-mono text-xs">
+                            <div class="text-emerald-400 mb-1">Status: <span id="sim-status">Scanning...</span></div>
+                            <div class="text-slate-400">Neck Angle: <span id="sim-angle" class="text-white">0°</span></div>
+                            <div class="text-slate-400">Shoulder Lvl: <span id="sim-shoulder" class="text-white">Balanced</span></div>
+                        </div>
+                        
+                        <!-- The Canvas -->
+                        <canvas id="postureCanvas" width="400" height="300" class="w-full h-auto bg-slate-800 rounded-lg"></canvas>
+                        
+                        <div class="mt-4 p-3 bg-slate-800 rounded border border-slate-700">
+                            <div class="text-xs text-slate-400 mb-1 uppercase tracking-wider">Live Analysis</div>
+                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                <div id="sim-bar" class="h-full bg-emerald-500 w-full transition-all duration-300"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Decorative Elements -->
+                    <div class="absolute -z-10 top-10 -right-10 w-24 h-24 bg-indigo-600 rounded-full blur-2xl opacity-20"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technical Features Section -->
+    <section id="features" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-slate-900 mb-4">Precision Engineering for Your Health</h2>
+                <p class="text-slate-600 max-w-2xl mx-auto">Posture Pal isn't just a timer. It's a sophisticated ergonomic analysis tool built with customizable parameters.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
+                    <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600 mb-4 group-hover:bg-indigo-600 group-hover:text-white transition">
+                        <i class="fa-solid fa-ruler-combined text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Neck Angle Analysis</h3>
+                    <p class="text-slate-600 text-sm">Real-time calculation of your cervical spine angle. Alerts trigger when you exceed your safe threshold (e.g., >15°).</p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
+                    <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 mb-4 group-hover:bg-emerald-600 group-hover:text-white transition">
+                        <i class="fa-solid fa-scale-balanced text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Shoulder Threshold</h3>
+                    <p class="text-slate-600 text-sm">Detects slouching by monitoring shoulder level variance. Keeps your upper back aligned and engaged.</p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
+                    <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 mb-4 group-hover:bg-orange-600 group-hover:text-white transition">
+                        <i class="fa-solid fa-eye text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Distance Monitoring</h3>
+                    <p class="text-slate-600 text-sm">Ensures you maintain a healthy screen distance to reduce eye strain and forward head posture.</p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
+                    <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center text-pink-600 mb-4 group-hover:bg-pink-600 group-hover:text-white transition">
+                        <i class="fa-solid fa-mug-hot text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Smart Break Intervals</h3>
+                    <p class="text-slate-600 text-sm">Customizable Pomodoro-style timers integrated with posture fatigue detection.</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
+                    <div class="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center text-cyan-600 mb-4 group-hover:bg-cyan-600 group-hover:text-white transition">
+                        <i class="fa-solid fa-stopwatch text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Warning Delay</h3>
+                    <p class="text-slate-600 text-sm">Intelligent buffer zones prevent false alarms when you just need to reach for your coffee.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="p-6 rounded-xl border border-slate-100 bg-slate-50 hover:shadow-xl transition hover:-translate-y-1 group">
+                    <div class="w-12 h-12 bg-violet-100 rounded-lg flex items-center justify-center text-violet-600 mb-4 group-hover:bg-violet-600 group-hover:text-white transition">
+                        <i class="fa-solid fa-chart-line text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Progress Tracking</h3>
+                    <p class="text-slate-600 text-sm">Visualize your posture improvements over time with detailed session analytics.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works / Demo Impact -->
+    <section id="demo" class="py-20 bg-slate-900 text-white relative overflow-hidden">
+        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid md:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold mb-6">Seamless Background Operation</h2>
+                    <div class="space-y-8">
+                        <div class="flex">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center font-bold">1</div>
+                            <div class="ml-4">
+                                <h4 class="text-xl font-semibold">Set Your Baseline</h4>
+                                <p class="text-slate-400 mt-2">Sit up straight and click "Calibrate". Posture Pal maps your ideal ergonomic position.</p>
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center font-bold">2</div>
+                            <div class="ml-4">
+                                <h4 class="text-xl font-semibold">Study Distraction-Free</h4>
+                                <p class="text-slate-400 mt-2">The app minimizes to the tray. The camera scans periodically, respecting your privacy and CPU.</p>
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center font-bold">3</div>
+                            <div class="ml-4">
+                                <h4 class="text-xl font-semibold">Gentle Corrections</h4>
+                                <p class="text-slate-400 mt-2">If you slouch past your threshold or lean too close, receive a subtle notification to reset.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-2xl">
+                    <!-- Mock Interface Code Snippet -->
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <div class="font-mono text-xs text-green-400">
+                        <p class="mb-2"><span class="text-purple-400">def</span> <span class="text-blue-400">check_posture</span>(frame):</p>
+                        <p class="pl-4 mb-1">landmarks = pose.process(frame)</p>
+                        <p class="pl-4 mb-1"><span class="text-purple-400">if</span> calculate_neck_angle(landmarks) > <span class="text-orange-400">15</span>:</p>
+                        <p class="pl-8 mb-1">status = <span class="text-yellow-300">"Poor Posture"</span></p>
+                        <p class="pl-8 mb-1">ui.alert(<span class="text-yellow-300">"Sit up straight!"</span>)</p>
+                        <p class="pl-4 mb-1"><span class="text-purple-400">else</span>:</p>
+                        <p class="pl-8">status = <span class="text-yellow-300">"Good"</span></p>
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-slate-700 text-center">
+                        <p class="text-sm text-slate-400 italic">"Technology that understands body mechanics."</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Me Section -->
+    <section id="about" class="py-20 bg-slate-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-bold text-slate-900 mb-8">Behind The Code</h2>
+            <div class="bg-white p-8 rounded-2xl shadow-lg border border-slate-100">
+                <div class="w-24 h-24 bg-gradient-to-tr from-indigo-500 to-cyan-400 rounded-full mx-auto mb-6 flex items-center justify-center">
+                    <i class="fa-solid fa-user-astronaut text-4xl text-white"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-slate-900">The Mission</h3>
+                <p class="text-slate-600 mt-4 leading-relaxed">
+                    As students and developers, we spend hours glued to our screens. We realized that back pain was affecting our focus and long-term health. 
+                    <br><br>
+                    Posture Pal was born out of a desire to combine <strong>computer vision AI</strong> with <strong>ergonomic science</strong>. We didn't just want to build another timer app; we wanted to build a smart assistant that actually sees and understands how you work.
+                </p>
+                
+                <div class="mt-8 flex justify-center gap-4">
+                    <a href="#" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-brands fa-github text-2xl"></i></a>
+                    <a href="#" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-brands fa-linkedin text-2xl"></i></a>
+                    <a href="#" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-brands fa-twitter text-2xl"></i></a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="py-20 bg-white">
+        <div class="max-w-5xl mx-auto px-4 text-center">
+            <h2 class="text-4xl font-bold text-slate-900 mb-6">Ready to improve your posture?</h2>
+            <p class="text-xl text-slate-600 mb-10">Join thousands of students studying smarter, not harder.</p>
+            
+            <div class="flex flex-col sm:flex-row justify-center gap-6">
+                <button class="flex items-center justify-center px-8 py-4 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition shadow-lg">
+                    <i class="fa-brands fa-apple text-3xl mr-3"></i>
+                    <div class="text-left">
+                        <div class="text-xs text-slate-400">Coming Soon</div>
+                        <div class="font-bold text-lg">macOS</div>
+                    </div>
+                </button>
+                <button class="flex items-center justify-center px-8 py-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">
+                    <i class="fa-brands fa-windows text-3xl mr-3"></i>
+                    <div class="text-left">
+                        <div class="text-xs text-indigo-200">Download for</div>
+                        <div class="font-bold text-lg">Windows 10/11</div>
+                    </div>
+                </button>
+            </div>
+            <p class="mt-6 text-sm text-slate-400">v1.0.2 Beta | Privacy Focused: Images are processed locally.</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-300 py-10 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
+            <div class="mb-4 md:mb-0">
+                <span class="font-bold text-white">Posture Pal</span> &copy; 2023. All rights reserved.
+            </div>
+            <div class="flex gap-6 text-sm">
+                <a href="#" class="hover:text-white">Privacy Policy</a>
+                <a href="#" class="hover:text-white">Terms of Service</a>
+                <a href="#" class="hover:text-white">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- CHATBOT WIDGET START -->
+    <!-- This is the container for your future Chatbot integration -->
+    
+    <!-- Floating Button -->
+    <button onclick="toggleChat()" class="chat-bubble bg-indigo-600 hover:bg-indigo-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110">
+        <i class="fa-solid fa-message text-xl"></i>
+    </button>
+
+    <!-- Chat Window -->
+    <div id="chat-window" class="chat-window">
+        <!-- Chat Header -->
+        <div class="bg-indigo-600 p-4 flex justify-between items-center text-white">
+            <div class="font-bold"><i class="fa-solid fa-robot mr-2"></i>PostureBot AI</div>
+            <button onclick="toggleChat()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-times"></i></button>
+        </div>
+        
+        <!-- Chat Messages Area -->
+        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-3">
+            <!-- Initial Greeting -->
+            <div class="flex justify-start">
+                <div class="bg-white border border-slate-200 text-slate-700 rounded-lg rounded-tl-none px-4 py-2 text-sm shadow-sm max-w-[80%]">
+                    Hi! I'm your posture assistant. Ask me about ergonomic setups or how to configure the app!
+                </div>
+            </div>
+            <!-- Dynamic messages will be injected here via JS later -->
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-3 bg-white border-t border-slate-200">
+            <div class="flex gap-2">
+                <input type="text" placeholder="Type a message..." class="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:border-indigo-500 text-sm">
+                <button class="bg-indigo-600 text-white px-3 py-2 rounded-md hover:bg-indigo-700">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- CHATBOT WIDGET END -->
+
+    <script>
+        // 1. Mobile Menu Toggle
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+
+        btn.addEventListener('click', () => {
+            menu.classList.toggle('hidden');
+        });
+
+        // 2. Chatbot Toggle Logic
+        function toggleChat() {
+            const chatWindow = document.getElementById('chat-window');
+            if (chatWindow.style.display === 'flex') {
+                chatWindow.style.display = 'none';
+            } else {
+                chatWindow.style.display = 'flex';
+                chatWindow.classList.add('chat-visible');
+            }
+        }
+
+        // 3. Canvas Animation: "Posture Simulation"
+        // This visualizes the innovation without needing the actual webcam code yet
+        const canvas = document.getElementById('postureCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('sim-status');
+        const angleEl = document.getElementById('sim-angle');
+        const barEl = document.getElementById('sim-bar');
+        
+        let time = 0;
+        
+        function drawSkeleton(postureFactor) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid background
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let i=0; i<canvas.width; i+=40) { ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); }
+            for(let i=0; i<canvas.height; i+=40) { ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); }
+            ctx.stroke();
+
+            // Colors based on posture
+            const isBad = postureFactor > 0.6;
+            const color = isBad ? '#ef4444' : '#10b981'; // Red or Green
+            
+            // Skeleton points (Simple interpolation between good and bad state)
+            const headX = 200 + (postureFactor * 40); // Head moves forward
+            const headY = 100 + (postureFactor * 20); // Head drops
+            const neckX = 200;
+            const neckY = 150;
+            const shoulderX = 200;
+            const shoulderY = 160;
+
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+
+            // Draw Body
+            ctx.beginPath();
+            ctx.moveTo(neckX, neckY);
+            ctx.lineTo(neckX, 280); // Spine
+            ctx.moveTo(160, shoulderY); // Left Shoulder
+            ctx.lineTo(240, shoulderY); // Right Shoulder
+            ctx.stroke();
+
+            // Draw Neck connection
+            ctx.beginPath();
+            ctx.moveTo(neckX, neckY);
+            ctx.lineTo(headX, headY);
+            ctx.stroke();
+
+            // Draw Head
+            ctx.beginPath();
+            ctx.arc(headX, headY - 30, 30, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Face Features (Eyes)
+            ctx.beginPath();
+            ctx.arc(headX + 10, headY - 35, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Angle Line Visualization
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(neckX, neckY); // Vertical ref
+            ctx.lineTo(neckX, headY - 50);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Update UI Stats
+            const angle = Math.round(postureFactor * 45);
+            angleEl.innerText = angle + "°";
+            angleEl.style.color = isBad ? '#ef4444' : '#fff';
+            
+            statusEl.innerText = isBad ? "Slouching Detected" : "Good Posture";
+            statusEl.className = isBad ? "font-bold text-red-400" : "font-bold text-emerald-400";
+            
+            barEl.style.width = ((1 - postureFactor) * 100) + "%";
+            barEl.className = `h-full transition-all duration-300 ${isBad ? 'bg-red-500' : 'bg-emerald-500'}`;
+        }
+
+        function animate() {
+            time += 0.02;
+            // Create a sine wave motion that lingers in "good" posture then dips to "bad"
+            let posture = (Math.sin(time) + 1) / 2; 
+            
+            // Make the movement snappier
+            if(posture < 0.3) posture = 0.1; // Stay good
+            else if(posture > 0.7) posture = 0.8; // Stay bad
+            
+            drawSkeleton(posture);
+            requestAnimationFrame(animate);
+        }
+
+        // Start animation
+        animate();
+
+    </script>
+</body>
+</html>
